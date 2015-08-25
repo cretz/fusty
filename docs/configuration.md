@@ -16,8 +16,7 @@ In the future, the web application may also be able to handle configuration in a
 
 Below is a JSON configuration for general top-level settings for Fusty. Comments are present to explain each part:
 
-```json
-
+```js
 // The IP to listen on. Default is all IPs
 // "ip": "127.0.0.1"
 
@@ -46,7 +45,7 @@ Fusty needs to have a location to store the backup information. This is configur
 of data store is specified via `type`. Currently the only supported type is `git`. Below is an example JSON
 configuration with comments explaining each part.
 
-```json
+```js
 "data_store": {
 
   // Git is the only supported type
@@ -94,7 +93,7 @@ A job store is where the configuration information for jobs is stored and retrie
 local job stores currently. Below is an example of a local job store configuration in JSON with comments explaining each
 part.
 
-```json
+```js
 "job_store": {
 
   // Local is the only supported type
@@ -158,7 +157,7 @@ There are many settings a job can have. Please reference the [Jobs](jobs.md) doc
 A device store is where device lists and their access information is stored. Currently only the local device store is
 supported. Below is an example of device configuration in JSON with comments.
 
-```json
+```js
 "device_store": {
 
   // Local is the only supported type
