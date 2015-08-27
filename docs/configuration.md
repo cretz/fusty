@@ -97,7 +97,7 @@ part.
 "job_store": {
 
   // Local is the only supported type
-  "type" = "local",
+  "type": "local",
 
   // All local job configs must go under the "local" section
   "local": {
@@ -161,7 +161,7 @@ supported. Below is an example of device configuration in JSON with comments.
 "device_store": {
 
   // Local is the only supported type
-  "type" = "local",
+  "type": "local",
 
   // All local device configs must go under the "local" section
   "local": {
@@ -173,14 +173,22 @@ supported. Below is an example of device configuration in JSON with comments.
       "default": {
 
         // Protocol is just one of many settings that can be set per device. They are not all listed here
-        // "protocol": "ssh"
+        // "protocol": {
+        //   "type": "ssh",
+        //   "ssh": {
+        //     "port": 22
+        //   }
+        // }
       },
 
     // All devices are listed here
     "devices": {
 
-      // This is the IP or hostname of the device that is used during connection
+      // This is the name of the device. The IP or hostname of the device that is used during connection is preferred.
       "device1.local": {
+      
+        // The host to actually connect to. This defaults as the name
+        // "host": "device1.local"
 
         // The generic settings to inherit. Default is "default"
         // "generic": "default"

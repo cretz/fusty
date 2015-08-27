@@ -16,6 +16,7 @@ settings and the defaults are below.
     1970-01-01.
   * `iso_8601` - [ISO-8601](https://en.wikipedia.org/wiki/ISO_8601#Time_intervals) interval string. This is expected to
     be a repeating interval.
+  * `fixed` - Unix time to run this exactly
 * `command` - No default, required
   * `inline` - An array of commands to run to obtain the text to backup
 

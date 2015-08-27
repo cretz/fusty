@@ -7,7 +7,10 @@ Devices are machines which jobs are executed on.
 These are the settings per device. They can be set in the [configuration](configuration.md) file. The details of the
 settings and the defaults are below.
 
-* `protocol` - Optional. The string "ssh" is the only accepted value currently. It is also the default.
+* `protocol` - Optional object. Default is of type "ssh" and port 22 inside of ssh object.
+  * `type` - Required if protocol present. The only acceptable value currently is "ssh".
+  * `ssh` - Required if protocol present.
+    * `port` - Required if protocol present. The port to connect to SSH on.
 * `tags` - Optional collection of tag strings. This allows workers to choose specific devices.
 * `credentials` - Required.
   * `user` - The username to login as

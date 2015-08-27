@@ -10,4 +10,5 @@ Fusty is a device backup tool. It logs in to devices, runs commands, and persist
 - [Data Store](data.md)
 - [Jobs](jobs.md)
 - [Devices](devices.md)
+- [API](api.md)
 - [Developers](developers.md)

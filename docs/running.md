@@ -15,7 +15,7 @@ A controller is the main server coordinating the application. To run it, simply 
     fusty controller [-config=./fusty.conf.json]
 
 Once this has started, the controller's web application will be available at the configured host and port. Default is
-https://127.0.0.1:9400.
+https://127.0.0.1:9400. On first start without a configuration file, the web application will lead
 
 The `-config` option can be provided to point to a specific configuration file. If not present, the application will
 look for `fusty.conf.json` in the current working directory. See the [configuration](configuration.md) documentation for
