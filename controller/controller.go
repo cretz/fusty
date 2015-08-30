@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"gitlab.com/cretz/fusty/controller/config"
+	"gitlab.com/cretz/fusty/config"
 	"log"
 )
 
@@ -11,8 +11,4 @@ type Controller struct {
 	Scheduler
 	DataStore
 	*log.Logger
-}
-
-type DeviceStore interface {
-	AllDevices() map[string]*Device
 }

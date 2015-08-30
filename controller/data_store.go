@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"gitlab.com/cretz/fusty/controller/config"
+	"gitlab.com/cretz/fusty/config"
 	"log"
 	"os"
 	"os/exec"
@@ -20,7 +20,7 @@ type DataStore interface {
 	Store(job *DataStoreJob)
 }
 
-func NewDataStore(conf *config.DataStore) (DataStore, error) {
+func NewDataStoreFromConfig(conf *config.DataStore) (DataStore, error) {
 	switch conf.Type {
 	case "git":
 		return newGitDataStore(conf.DataStoreGit)

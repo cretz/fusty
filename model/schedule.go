@@ -1,9 +1,9 @@
-package controller
+package model
 
 import (
 	"errors"
 	"github.com/gorhill/cronexpr"
-	"gitlab.com/cretz/fusty/controller/config"
+	"gitlab.com/cretz/fusty/config"
 	"time"
 )
 
@@ -12,7 +12,7 @@ type Schedule interface {
 	LatestBetween(start time.Time, end time.Time) time.Time
 }
 
-func ScheduleFromConfig(sched *config.JobSchedule) (Schedule, error) {
+func NewScheduleFromConfig(sched *config.JobSchedule) (Schedule, error) {
 	if sched.Cron == "" {
 		return nil, errors.New("Only cron supported currently")
 	}

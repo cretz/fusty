@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"gitlab.com/cretz/fusty/model"
 	"sync"
 	"time"
 )
@@ -10,9 +11,9 @@ type Scheduler interface {
 }
 
 type Execution struct {
-	Device    *Device   `json:"device"`
-	Job       *Job      `json:"job"`
-	Timestamp time.Time `json:"timestamp"`
+	Device    *model.Device `json:"device"`
+	Job       *model.Job    `json:"job"`
+	Timestamp time.Time     `json:"timestamp"`
 }
 
 type schedulerLocal struct {
@@ -50,7 +51,7 @@ func (j *schedulerLocal) NextExecution(tags []string, before time.Time) *Executi
 	return nil
 }
 
-func (j *schedulerLocal) addDeviceJob(dev *Device) error {
+func (j *schedulerLocal) addDeviceJob(dev *model.Device) error {
 	for _, job := range dev.Jobs {
 		dev := &deviceJob{
 			Device:  dev,
@@ -73,8 +74,8 @@ func (j *schedulerLocal) addDeviceJobToTag(tag string, d *deviceJob) {
 }
 
 type deviceJob struct {
-	*Device
-	*Job
+	*model.Device
+	*model.Job
 	lastRun     time.Time
 	lastRunLock *sync.Mutex
 }
