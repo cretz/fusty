@@ -59,8 +59,9 @@ has asked for that job. Those should be run immediately.
 
 ### POST /worker/complete
 
-A job completion. This is posted as multipart form fields. The form fields:
+A job completion. This is posted as multipart form fields. Success if 200. The form fields:
 
+* job - The job name
 * device - The device name (not host)
 * job_timestamp - The unix timestamp this was supposed to start on
 * start_timestamp - The unix timestamp this actually started on

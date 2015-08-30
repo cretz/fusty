@@ -5,6 +5,7 @@ type Config struct {
 	Port         int    `json:"port"`
 	LogLevel     string `json:"log_level"`
 	Syslog       bool   `json:"syslog"`
+	MaxJobBytes  int64  `json:"max_job_bytes"`
 	*Tls         `json:"tls"`
 	*DataStore   `json:"data_store"`
 	*JobStore    `json:"job_store"`

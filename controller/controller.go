@@ -9,6 +9,7 @@ type Controller struct {
 	*config.Config
 	DeviceStore
 	Scheduler
+	DataStore
 	*log.Logger
 }
 

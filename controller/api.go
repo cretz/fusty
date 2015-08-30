@@ -2,11 +2,15 @@ package controller
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 )
+
+// 500 meg
+const MaxJobBytes int64 = 524288000
 
 func (c *Controller) addApiHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/worker/next", c.apiWorkerNext)
@@ -64,5 +68,66 @@ func (c *Controller) apiWorkerNext(w http.ResponseWriter, req *http.Request) {
 }
 
 func (c *Controller) apiWorkerComplete(w http.ResponseWriter, req *http.Request) {
-	w.Write([]byte("TODO\n"))
+	var maxBytes = MaxJobBytes
+	if c.Config.MaxJobBytes != 0 {
+		maxBytes = c.Config.MaxJobBytes
+	}
+	if err := req.ParseMultipartForm(maxBytes); err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
+		return
+	}
+	// Try to read contents
+	contents := []byte{}
+	if files := req.MultipartForm.File["file"]; len(files) == 1 {
+		f, err := files[0].Open()
+		if err != nil {
+			http.Error(w, "Unable to read file: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer f.Close()
+		contents, err = ioutil.ReadAll(f)
+		if err != nil {
+			http.Error(w, "Unable to read file: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	// Build job and validate
+	job := &DataStoreJob{
+		JobName:    singleMutlipartFormValOrEmpty("job", req),
+		DeviceName: singleMutlipartFormValOrEmpty("device", req),
+		JobTime:    timestampOrZero("job_timestamp", req),
+		StartTime:  timestampOrZero("start_timestamp", req),
+		EndTime:    timestampOrZero("end_timestamp", req),
+		Failure:    singleMutlipartFormValOrEmpty("failure", req),
+		Contents:   contents,
+	}
+	if job.JobName == "" || job.DeviceName == "" ||
+		job.JobTime.IsZero() || job.StartTime.IsZero() || job.EndTime.IsZero() {
+		http.Error(w,
+			"Fields job, device, job_timestamp, start_timestamp, end_timestamp are required", http.StatusBadRequest)
+		return
+	} else if job.Failure == "" && len(job.Contents) == 0 {
+		http.Error(w, "Failure and contents may not both be empty", http.StatusBadRequest)
+		return
+	}
+	c.DataStore.Store(job)
+	w.WriteHeader(http.StatusOK)
+}
+
+func timestampOrZero(name string, req *http.Request) time.Time {
+	if str := singleMutlipartFormValOrEmpty(name, req); str == "" {
+		return time.Time{}
+	} else if i, err := strconv.ParseInt(str, 10, 0); err != nil {
+		return time.Time{}
+	} else {
+		return time.Unix(i, 0)
+	}
+}
+
+func singleMutlipartFormValOrEmpty(name string, req *http.Request) string {
+	vals := req.MultipartForm.Value[name]
+	if len(vals) == 0 {
+		return ""
+	}
+	return vals[0]
 }

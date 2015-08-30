@@ -1,3 +1,19 @@
+Open Questions:
+* What do I do on git failure?
+* Where do I persist worker job failure?
+* What to do about the fact that I want to store things in memory?
+* What brief, high-level verbage can we use as a tagline for the product that basically says "like rancid, but can
+  backup non-network devices too"?
+* Chances to lose a config listed below. Which are not acceptable and how should we report?
+  * Workers too busy
+  * Worker death
+  * Controller death
+  * Git server failure
+* Is the readme overview feature worth it?
+* If they change the git location, should we require they delete the data dir since none of the git paths are right any more?
+* When workers are requesting tags of work, is it ok to get all for their first tag, then some for their next and so on,
+  or should I balance across requested tags?
+
 For MVP:
 * Embed web application:
   * Web application by default allowed to write the configuration, so setup can really be bootstrapped in a browser, yay

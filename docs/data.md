@@ -16,18 +16,18 @@ might look like this:
 ├── reporoot/
 │   ├── by_job/
 │   │   ├── job1_name/
-│   │   │   ├── device1.local.txt
-│   │   │   ├── device2.local.txt
+│   │   │   ├── device1.local
+│   │   │   ├── device2.local
 │   │   ├── job2_name/
-│   │   │   ├── device1.local.txt
-│   │   │   ├── device2.local.txt
+│   │   │   ├── device1.local
+│   │   │   ├── device2.local
 │   ├── by_device/
 │   │   ├── device1.local/
-│   │   │   ├── job1_name.txt
-│   │   │   ├── job2_name.txt
+│   │   │   ├── job1_name
+│   │   │   ├── job2_name
 │   │   ├── device2.local/
-│   │   │   ├── job1_name.txt
-│   │   │   ├── job2_name.txt
+│   │   │   ├── job1_name
+│   │   │   ├── job2_name
 ```
 
 ### Pools and Atomicness
