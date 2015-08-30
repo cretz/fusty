@@ -25,7 +25,8 @@ type DataStoreGit struct {
 	*DataStoreGitUser      `json:"user"`
 	PoolSize               int      `json:"pool_size"`
 	Structure              []string `json:"structure"`
-	IncludeReadmeOverviews bool     `json:"include_readme_overviews`
+	IncludeReadmeOverviews bool     `json:"include_readme_overviews"`
+	DataDir                string   `json:"data_dir"`
 }
 
 type DataStoreGitUser struct {
@@ -42,7 +43,7 @@ type JobStore struct {
 
 type JobStoreLocal struct {
 	JobGenerics map[string]*Job `json:"job_generics"`
-	Jobs        map[string]*Job `json:"jobs`
+	Jobs        map[string]*Job `json:"jobs"`
 }
 
 type Job struct {
@@ -74,7 +75,7 @@ type DeviceStore struct {
 
 type DeviceStoreLocal struct {
 	DeviceGenerics map[string]*Device `json:"device_generics"`
-	Devices        map[string]*Device `json:"devices`
+	Devices        map[string]*Device `json:"devices"`
 }
 
 type Device struct {
@@ -87,7 +88,7 @@ type Device struct {
 
 type DeviceProtocol struct {
 	Type               string `json:"type"`
-	*DeviceProtocolSsh `json:ssh"`
+	*DeviceProtocolSsh `json:"ssh"`
 }
 
 type DeviceProtocolSsh struct {

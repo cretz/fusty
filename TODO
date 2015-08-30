@@ -16,7 +16,8 @@ For MVP:
 
 Future:
 * HA controller support
-  * Probably via https://github.com/golang/groupcache (embedded of course)
+  * Probably via https://github.com/golang/groupcache (embedded of course). Actually, https://serfdom.io/ would be
+    better
   * Have to no longer support from-file configuration except for first-use bootstrapping because it's hard to keep in
     sync on disk because there is no pubsub
   * Might not want to store things like git private keys in shared form and instead error if the one we want isn't on

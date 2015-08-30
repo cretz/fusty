@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"sync"
 	"time"
 )
 
@@ -32,7 +33,7 @@ func (j *schedulerLocal) NextExecution(tags []string, before time.Time) *Executi
 	// TODO: Should we balance our requests across tags better to prevent
 	// multi-tag workers from getting all of one or another?
 	// TODO: Also, we make no effort to get the very next one, we just grab a chunk
-	if len(tags) {
+	if len(tags) == 0 {
 		tags = []string{""}
 	}
 	for _, tag := range tags {
@@ -74,10 +75,13 @@ func (j *schedulerLocal) addDeviceJobToTag(tag string, d *deviceJob) {
 type deviceJob struct {
 	*Device
 	*Job
-	lastRun time.Time
+	lastRun     time.Time
+	lastRunLock *sync.Mutex
 }
 
 func (d deviceJob) nextRun(before time.Time) time.Time {
+	d.lastRunLock.Lock()
+	defer d.lastRunLock.Unlock()
 	ret := d.Job.LatestBetween(d.lastRun, before)
 	if !ret.IsZero() {
 		d.lastRun = ret

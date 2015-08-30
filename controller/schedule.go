@@ -31,7 +31,7 @@ func NewCronSchedule(cron string) (*CronSchedule, error) {
 	}
 }
 
-func (c *CronSchedule) LatestBetween(start int64, end int64) time.Time {
+func (c *CronSchedule) LatestBetween(start time.Time, end time.Time) time.Time {
 	previous := time.Time{}
 	for {
 		res := c.expr.Next(start)

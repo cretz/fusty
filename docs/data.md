@@ -34,7 +34,7 @@ might look like this:
 
 Fusty writes (or overwrites) a file for every job execution for every device. Ideally every single write would be done
 asynchronously but there can be conflicts with Git when writing to the same file without having the latest update.
-Therefore each write to a specific file in Fustry is queued up for that specific file. This ensures that each file is
+Therefore each write to a specific file in Fusty is queued up for that specific file. This ensures that each file is
 updated with the latest information. Since there is only one file per device and job, there is rarely a concern of
 writes being stalled because they are queued.
 
