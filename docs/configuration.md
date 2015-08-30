@@ -2,15 +2,14 @@
 
 Fusty is configured via configuration files. The configuration can currently only be written in JSON. In the future
 [YAML](http://yaml.org/), [TOML](https://github.com/toml-lang/toml), [HCL](https://github.com/hashicorp/hcl), and
-JSON with comments may be supported.
+JSON with comments may be supported. The recommended approach to configuring Fusty is to use the web application that
+starts with the controller.
 
 By default the configuration file is assumed to be `fusty.conf.json` in the current working directory, but this can be
 configured to point to any path. Each section below represents one section of configuration, but they are all together
 in the single configuration file. Although the examples in the sections below use JSON with comments, the actual
 implementation does not currently support comments in JSON files. Some sections are commented out because they are
 optional.
-
-In the future, the web application may also be able to handle configuration in addition to manual file editing.
 
 ## General Settings
 
@@ -90,8 +89,7 @@ documentation.
 ## Job Store
 
 A job store is where the configuration information for jobs is stored and retrieved from. Currently, Fusty only supports
-local job stores currently. Below is an example of a local job store configuration in JSON with comments explaining each
-part.
+local job stores. Below is an example of a local job store configuration in JSON with comments explaining each part.
 
 ```js
 "job_store": {

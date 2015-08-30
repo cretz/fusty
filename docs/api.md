@@ -51,7 +51,7 @@ value expanded as necessary and no generics. Example response:
     }
   },
   "timestamp": 446536800
-}
+]
 ```
 
 The schedule is always a fixed unix timestamp. There are cases where a timestamp may be in the past because no worker

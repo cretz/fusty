@@ -7,6 +7,7 @@ Devices are machines which jobs are executed on.
 These are the settings per device. They can be set in the [configuration](configuration.md) file. The details of the
 settings and the defaults are below.
 
+* `host` - Optional hostname or IP for the device. If not present in configuration, the name is used.
 * `protocol` - Optional object. Default is of type "ssh" and port 22 inside of ssh object.
   * `type` - Required if protocol present. The only acceptable value currently is "ssh".
   * `ssh` - Required if protocol present.
