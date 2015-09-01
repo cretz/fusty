@@ -1,5 +1,10 @@
 package config
 
+import (
+	"encoding/json"
+	"io/ioutil"
+)
+
 type Config struct {
 	Ip           string `json:"ip"`
 	Port         int    `json:"port"`
@@ -10,6 +15,23 @@ type Config struct {
 	*DataStore   `json:"data_store"`
 	*JobStore    `json:"job_store"`
 	*DeviceStore `json:"device_store"`
+}
+
+func NewFromFile(filename string) (*Config, error) {
+	bytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	return NewFromBytes(bytes)
+}
+
+func NewFromBytes(bytes []byte) (*Config, error) {
+	conf := new(Config)
+	if err := json.Unmarshal(bytes, conf); err != nil {
+		return nil, err
+	}
+	// TODO: extra validation
+	return conf, nil
 }
 
 type Tls struct {
