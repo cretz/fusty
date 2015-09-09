@@ -17,7 +17,7 @@ Below is a JSON configuration for general top-level settings for Fusty. Comments
 
 ```js
 // The IP to listen on. Default is all IPs
-// "ip": "127.0.0.1"
+// "ip": "0.0.0.0"
 
 // The port to listen on. Default is 9400
 // "port": 9400

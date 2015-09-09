@@ -2,6 +2,8 @@ package controller
 
 import (
 	"encoding/json"
+	"fmt"
+	"gitlab.com/cretz/fusty/model"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -14,7 +16,7 @@ const MaxJobBytes int64 = 524288000
 
 func (c *Controller) addApiHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/worker/next", c.apiWorkerNext)
-	mux.HandleFunc("/worker/complete", c.apiWorkerNext)
+	mux.HandleFunc("/worker/complete", c.apiWorkerComplete)
 }
 
 func (c *Controller) apiWorkerNext(w http.ResponseWriter, req *http.Request) {
@@ -46,7 +48,7 @@ func (c *Controller) apiWorkerNext(w http.ResponseWriter, req *http.Request) {
 			max = v
 		}
 	}
-	executions := make([]*Execution, 0, max)
+	executions := make([]*model.Execution, 0, max)
 	fromNow := time.Now().Add(time.Duration(seconds) * time.Second)
 	for i := 0; i < max; i++ {
 		if execution := c.NextExecution(tags, fromNow); execution == nil {
@@ -60,7 +62,7 @@ func (c *Controller) apiWorkerNext(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if body, err := json.Marshal(executions); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Internal error: %v", err), http.StatusInternalServerError)
 	} else {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(body)
@@ -69,8 +71,8 @@ func (c *Controller) apiWorkerNext(w http.ResponseWriter, req *http.Request) {
 
 func (c *Controller) apiWorkerComplete(w http.ResponseWriter, req *http.Request) {
 	var maxBytes = MaxJobBytes
-	if c.Config.MaxJobBytes != 0 {
-		maxBytes = c.Config.MaxJobBytes
+	if c.conf.MaxJobBytes != 0 {
+		maxBytes = c.conf.MaxJobBytes
 	}
 	if err := req.ParseMultipartForm(maxBytes); err != nil {
 		http.Error(w, "Invalid form", http.StatusBadRequest)

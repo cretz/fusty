@@ -2,7 +2,9 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
+	"gitlab.com/cretz/fusty/controller"
 	"log"
 	"os"
 )
@@ -30,20 +32,14 @@ func run(command string, args ...string) error {
 }
 
 func runController(args ...string) error {
-	return errors.New("TODO")
-	//	flags := flag.NewFlagSet("flags", flag.ContinueOnError)
-	//	configFile := flags.String("config", "", "Configuration file")
-	//	if err := flags.Parse(args); err != nil {
-	//		return fmt.Errorf("Error parsing arguments: %v", err)
-	//	} else if flags.NArg() != 0 {
-	//		return errors.New("Controller only accepts single config-file argument at most")
-	//	}
-	//	var conf *config.Config = nil
-	//	if configFile == "" {
-	//		if _, err := os.Stat("./fusty.conf.json"); err == nil {
-	//
-	//		}
-	//	}
+	flags := flag.NewFlagSet("flags", flag.ContinueOnError)
+	configFile := flags.String("config", "", "Configuration file")
+	if err := flags.Parse(args); err != nil {
+		return fmt.Errorf("Error parsing arguments: %v", err)
+	} else if flags.NArg() != 0 {
+		return errors.New("Controller only accepts single config-file argument at most")
+	}
+	return controller.RunController(*configFile)
 }
 
 func runWorker(args ...string) error {

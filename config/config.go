@@ -17,6 +17,10 @@ type Config struct {
 	*DeviceStore `json:"device_store"`
 }
 
+func NewDefault() *Config {
+	return &Config{}
+}
+
 func NewFromFile(filename string) (*Config, error) {
 	bytes, err := ioutil.ReadFile(filename)
 	if err != nil {

@@ -23,15 +23,15 @@ more information.
 
 ## Running a Worker
 
-    fusty worker [-controller=https://127.0.0.1:9400] [-tag=tag1] [-tag=tag2] [-sleep=15] [-maxjobs=N]
+    fusty worker [-controller=http://127.0.0.1:9400] [-tag=tag1] [-tag=tag2] [-sleep=15] [-maxjobs=N]
 
 A worker doesn't have a configuration file but it does have optional settings:
 
-* `-controller` - This is the base URL for the controller. If not provided, it assumes `https://localhost:9400`.
+* `-controller` - This is the base URL for the controller. If not provided, it assumes `http://127.0.0.1:9400`.
 * `-tag` - This is the device tag that this worker accepts work for. This can be provided multiple times for multiple
   tags. If not provided, this worker accepts work for all device types.
 * `-sleep` - The number of seconds to wait to ask the controller for more work if none was given last request. The
   higher this number is, the more "off" a job run may be. By default this is 15 seconds.
-* `-maxjobs` - The maximum number of jobs this worker can be executing at any one time. By default this is infinite.
+* `-maxjobs` - The maximum number of jobs this worker can be executing at any one time. By default this is 2000.
 
 In the future, there will also be settings for TLS configuration.

@@ -7,13 +7,7 @@ import (
 )
 
 type Scheduler interface {
-	NextExecution(tags []string, before time.Time) *Execution
-}
-
-type Execution struct {
-	Device    *model.Device `json:"device"`
-	Job       *model.Job    `json:"job"`
-	Timestamp time.Time     `json:"timestamp"`
+	NextExecution(tags []string, before time.Time) *model.Execution
 }
 
 type schedulerLocal struct {
@@ -30,7 +24,7 @@ func (c *Controller) NewLocalScheduler() (Scheduler, error) {
 	return ret, nil
 }
 
-func (j *schedulerLocal) NextExecution(tags []string, before time.Time) *Execution {
+func (j *schedulerLocal) NextExecution(tags []string, before time.Time) *model.Execution {
 	// TODO: Should we balance our requests across tags better to prevent
 	// multi-tag workers from getting all of one or another?
 	// TODO: Also, we make no effort to get the very next one, we just grab a chunk
@@ -40,10 +34,10 @@ func (j *schedulerLocal) NextExecution(tags []string, before time.Time) *Executi
 	for _, tag := range tags {
 		for _, devJob := range j.deviceJobsByTag[tag] {
 			if runTime := devJob.nextRun(before); !runTime.IsZero() {
-				return &Execution{
+				return &model.Execution{
 					Device:    devJob.Device,
 					Job:       devJob.Job,
-					Timestamp: runTime,
+					Timestamp: runTime.Unix(),
 				}
 			}
 		}
