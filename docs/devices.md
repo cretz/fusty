@@ -17,6 +17,4 @@ settings and the defaults are below.
   * `user` - The username to login as
   * `pass` - The password to use to login. Currently only username/password authentication is supported. In the future
     other forms may be supported.
-  * `prompt` - This is the same type of object as the `prompt` setting in the [jobs](jobs.md) documentation. By default
-    this is the same prompt for the first job needing to login.
 * `jobs` - Required collection of jobs to run. Each job can have its own settings. Currently these are undefined.

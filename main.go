@@ -5,8 +5,10 @@ import (
 	"flag"
 	"fmt"
 	"gitlab.com/cretz/fusty/controller"
+	"gitlab.com/cretz/fusty/worker"
 	"log"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -43,9 +45,32 @@ func runController(args ...string) error {
 }
 
 func runWorker(args ...string) error {
-	return errors.New("TODO")
+	flags := flag.NewFlagSet("flags", flag.ContinueOnError)
+	conf := &worker.Config{}
+	flags.StringVar(&conf.ControllerUrl, "controller", "", "Base URL for controller")
+	var tags multistring
+	flags.Var(&tags, "tag", "One or more tags")
+	flags.IntVar(&conf.SleepSeconds, "sleep", 15, "Sleep seconds")
+	flags.IntVar(&conf.MaxJobs, "maxjobs", 2000, "Max running jobs")
+	flags.IntVar(&conf.TimeoutSeconds, "timeout", 3, "Controller HTTP timeout seconds")
+	if err := flags.Parse(args); err != nil {
+		return fmt.Errorf("Error parsing arguments: %v", err)
+	} else if flags.NArg() != 0 {
+		return fmt.Errorf("Unrecognized extra parameter: %v", flags.Arg(0))
+	}
+	conf.Tags = tags
+	return worker.RunWorker(conf)
 }
 
 func runHelp(args ...string) error {
 	return errors.New("TODO")
+}
+
+type multistring []string
+func (m *multistring) Set(value string) error {
+	*m = append(*m, value)
+	return nil
+}
+func (m *multistring) String() string {
+	return strings.Join(*m, ", ")
 }

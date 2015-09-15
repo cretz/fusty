@@ -22,6 +22,6 @@ settings and the defaults are below.
 
 ## Job Distribution
 
-Jobs are distributed across workers on a first-come-first-serve basis. If multiple jobs for the same device are waiting
-to go to the next worker for work and they use the same protocol, they will be executed together. This allows jobs to
-share the same connections and authentications for multiple jobs if the jobs are configured for the same frequency.
+Jobs are distributed across workers on a first-come-first-serve basis. All jobs may run concurrently, even if they are
+for the same device. Therefore job configurers are encouraged to avoid mutating or affecting global state which could
+affect other jobs on the same device.

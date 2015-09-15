@@ -51,14 +51,6 @@ func (d *Device) ApplyConfig(conf *config.Device) error {
 		if conf.DeviceCredentials.Pass != "" {
 			d.DeviceCredentials.Pass = conf.DeviceCredentials.Pass
 		}
-		if conf.DeviceCredentials.Prompt != nil {
-			if d.Prompt == nil {
-				d.Prompt = NewDefaultPrompt()
-			}
-			if err := d.Prompt.ApplyConfig(conf.DeviceCredentials.Prompt); err != nil {
-				return fmt.Errorf("Error building prompt: %v", err)
-			}
-		}
 	}
 	// We expect the job to be present to overwrite it with anything
 	for name, job := range conf.Jobs {
@@ -98,5 +90,4 @@ type SshDeviceProtocol struct {
 type DeviceCredentials struct {
 	User string
 	Pass string
-	*Prompt
 }

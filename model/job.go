@@ -8,7 +8,6 @@ import (
 
 type Job struct {
 	Name string
-	*Prompt
 	*CommandSet
 	Schedule
 }
@@ -18,14 +17,6 @@ func NewDefaultJob(name string) *Job {
 }
 
 func (j *Job) ApplyConfig(conf *config.Job) error {
-	if conf.Prompt != nil {
-		if j.Prompt == nil {
-			j.Prompt = NewDefaultPrompt()
-		}
-		if err := j.Prompt.ApplyConfig(conf.Prompt); err != nil {
-			return fmt.Errorf("Invalid prompt: %v", err)
-		}
-	}
 	if conf.JobCommand != nil {
 		if cmdSet, err := NewCommandSetFromConfig(conf.JobCommand); err != nil {
 			return fmt.Errorf("Invalid command set: %v", err)

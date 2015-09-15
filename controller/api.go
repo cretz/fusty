@@ -15,8 +15,17 @@ import (
 const MaxJobBytes int64 = 524288000
 
 func (c *Controller) addApiHandlers(mux *http.ServeMux) {
+	mux.HandleFunc("/worker/ping", c.apiWorkerPing)
 	mux.HandleFunc("/worker/next", c.apiWorkerNext)
 	mux.HandleFunc("/worker/complete", c.apiWorkerComplete)
+}
+
+func (c *Controller) apiWorkerPing(w http.ResponseWriter, req *http.Request) {
+	if req.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
 }
 
 func (c *Controller) apiWorkerNext(w http.ResponseWriter, req *http.Request) {
@@ -112,6 +121,7 @@ func (c *Controller) apiWorkerComplete(w http.ResponseWriter, req *http.Request)
 		http.Error(w, "Failure and contents may not both be empty", http.StatusBadRequest)
 		return
 	}
+	// TODO: do not store failures, log em instead
 	c.DataStore.Store(job)
 	w.WriteHeader(http.StatusOK)
 }

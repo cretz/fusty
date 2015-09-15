@@ -6,6 +6,10 @@ TODO (none for now)
 
 ## Calls
 
+### GET /worker/ping
+
+Simple call that returns 200 for the worker to confirm the controller is available.
+
 ### GET /worker/next?tag=tag1&tag=tag2&seconds=N&max=M
 
 Exclusively obtain the next set of jobs for the next N seconds guaranteeing that no more than M jobs are returned. If no

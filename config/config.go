@@ -75,13 +75,8 @@ type JobStoreLocal struct {
 
 type Job struct {
 	Generic      string `json:"generic"`
-	*Prompt      `json:"prompt"`
 	*JobSchedule `json:"schedule"`
 	*JobCommand  `json:"command"`
-}
-
-type Prompt struct {
-	EndsWith string `json:"string"`
 }
 
 type JobSchedule struct {
@@ -124,7 +119,6 @@ type DeviceProtocolSsh struct {
 }
 
 type DeviceCredentials struct {
-	User    string `json:"user"`
-	Pass    string `json:"pass"`
-	*Prompt `json:"prompt"`
+	User string `json:"user"`
+	Pass string `json:"pass"`
 }

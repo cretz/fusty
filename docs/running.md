@@ -33,5 +33,6 @@ A worker doesn't have a configuration file but it does have optional settings:
 * `-sleep` - The number of seconds to wait to ask the controller for more work if none was given last request. The
   higher this number is, the more "off" a job run may be. By default this is 15 seconds.
 * `-maxjobs` - The maximum number of jobs this worker can be executing at any one time. By default this is 2000.
+* `-timeout` - The maximum number of seconds to wait for the controller to respond to HTTP. By default this is 3.
 
 In the future, there will also be settings for TLS configuration.
