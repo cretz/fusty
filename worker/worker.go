@@ -93,7 +93,7 @@ func (w *Worker) Start() {
 		w.tick()
 		// We will sleep half the amount of time range configured
 		// to fetch jobs for.
-		time.Sleep(time.Duration(w.conf.SleepSeconds / 2) * time.Second)
+		time.Sleep(time.Duration(w.conf.SleepSeconds/2) * time.Second)
 	}
 }
 

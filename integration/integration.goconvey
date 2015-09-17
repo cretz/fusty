@@ -1,0 +1,1 @@
+-coverpkg=gitlab.com/cretz/fusty/config,gitlab.com/cretz/fusty/controller,gitlab.com/cretz/fusty/integration,gitlab.com/cretz/fusty/model,gitlab.com/cretz/fusty/worker

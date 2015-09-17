@@ -38,6 +38,10 @@ func NewFromBytes(bytes []byte) (*Config, error) {
 	return conf, nil
 }
 
+func (c *Config) ToBytes() ([]byte, error) {
+	return json.Marshal(c)
+}
+
 type Tls struct {
 	Enabled bool `json:"enabled"`
 }

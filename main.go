@@ -15,12 +15,12 @@ func main() {
 	if len(os.Args) <= 1 {
 		log.Fatal("Command required")
 	}
-	if err := run(os.Args[1], os.Args[2:]...); err != nil {
+	if err := Run(os.Args[1], os.Args[2:]...); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(command string, args ...string) error {
+func Run(command string, args ...string) error {
 	switch command {
 	case "controller":
 		return runController(args...)
@@ -67,6 +67,7 @@ func runHelp(args ...string) error {
 }
 
 type multistring []string
+
 func (m *multistring) Set(value string) error {
 	*m = append(*m, value)
 	return nil
