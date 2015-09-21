@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"gitlab.com/cretz/fusty/config"
 	"log"
+	"net/mail"
 	"os"
 	"os/exec"
 	"path"
@@ -23,6 +24,9 @@ type DataStore interface {
 func NewDataStoreFromConfig(conf *config.DataStore) (DataStore, error) {
 	switch conf.Type {
 	case "git":
+		if conf.DataStoreGit == nil {
+			return nil, errors.New("Data store for \"git\" required")
+		}
 		return newGitDataStore(conf.DataStoreGit)
 	default:
 		return nil, fmt.Errorf("Unrecognized data store type: %v", conf.Type)
@@ -74,6 +78,9 @@ func newGitDataStore(conf *config.DataStoreGit) (*gitDataStore, error) {
 		runningWriteIds:        make(map[string]map[string]bool),
 		waitingOnRunningWrites: make(map[string][]*DataStoreJob),
 	}
+	if err := dataStore.ValidateAndApplyDefaults(); err != nil {
+		return nil, err
+	}
 	for i := 0; i < conf.PoolSize; i++ {
 		worker := &gitWorker{
 			dir:       path.Join(conf.DataDir, "pool"+strconv.Itoa(i+1)),
@@ -85,6 +92,65 @@ func newGitDataStore(conf *config.DataStoreGit) (*gitDataStore, error) {
 		go worker.run()
 	}
 	return nil, errors.New("Not implemented")
+}
+
+func (g *gitDataStore) ValidateAndApplyDefaults() error {
+	if g.conf.Url == "" {
+		return errors.New("Data store for git requires url")
+	}
+	if g.conf.PoolSize == 0 {
+		g.conf.PoolSize = 20
+	}
+	if len(g.conf.Structure) == 0 {
+		g.conf.Structure = []string{GitStructureByDevice}
+	} else {
+		for _, structure := range g.conf.Structure {
+			if structure != GitStructureByDevice && structure != GitStructureByJob {
+				return fmt.Errorf("Unrecognized git structure: %v", structure)
+			}
+		}
+	}
+	if g.conf.DataDir == "" {
+		if dir, err := os.Getwd(); err != nil {
+			return fmt.Errorf("Unable to get current working directory: %v", err)
+		} else {
+			g.conf.DataDir = dir
+		}
+	} else if fi, err := os.Stat(g.conf.DataDir); err != nil {
+		return fmt.Errorf("Failure obtaining git data directory %v", g.conf.DataDir)
+	} else if !fi.IsDir() {
+		return fmt.Errorf("Git data directory %v not a directory", g.conf.DataDir)
+	}
+	if g.conf.DataStoreGitUser != nil {
+		if g.conf.DataStoreGitUser.Email != "" {
+			if _, err := mail.ParseAddress(g.conf.DataStoreGitUser.Email); err != nil {
+				return fmt.Errorf("Invalid email for git user: %v", err)
+			}
+		}
+		if g.conf.DataStoreGitUser.Pass != "" && g.conf.DataStoreGitUser.Name == "" {
+			return errors.New("If git password supplied, username must also be supplied")
+		}
+	}
+	// We do a simple ping check here to see if the repository even exists
+	_, err := doGitCmd("", g.username(), g.password(), "ls-remote", g.conf.Url)
+	if err != nil {
+		return fmt.Errorf("Git repository validation using ls-remote failed to validate URL %v: %v", g.conf.Url, err)
+	}
+	return nil
+}
+
+func (g *gitDataStore) username() string {
+	if g.conf.DataStoreGitUser != nil {
+		return g.conf.DataStoreGitUser.Name
+	}
+	return ""
+}
+
+func (g *gitDataStore) password() string {
+	if g.conf.DataStoreGitUser != nil {
+		return g.conf.DataStoreGitUser.Pass
+	}
+	return ""
 }
 
 func (g *gitDataStore) Store(job *DataStoreJob) {
@@ -290,32 +356,7 @@ func (g *gitWorker) push() error {
 }
 
 func (g *gitWorker) doGitCmd(args ...string) (string, error) {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = g.dir
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	pipe, err := cmd.StdinPipe()
-	if err != nil {
-		return "", fmt.Errorf("Cannot open stdin: %v", err)
-	}
-	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("Unable to run git in %v: %v", g.dir, err)
-	}
-	// TODO: this doesn't feel right, should I sleep before checking out, etc
-	if strings.HasSuffix(out.String(), "Username:") {
-		_, err = pipe.Write([]byte(g.dataStore.conf.DataStoreGitUser.Name + "\n"))
-	}
-	if err == nil && strings.HasSuffix(out.String(), "Password:") {
-		_, err = pipe.Write([]byte(g.dataStore.conf.DataStoreGitUser.Pass + "\n"))
-	}
-	if err == nil {
-		err = cmd.Wait()
-	}
-	if err != nil {
-		return "", fmt.Errorf("Error running git in %v: %v. Output:\n%v", g.dir, err, out.String())
-	}
-	return out.String(), nil
+	return doGitCmd(g.dir, g.dataStore.username(), g.dataStore.password(), args...)
 }
 
 func (g *gitWorker) writeGitFile(path string, contents []byte) error {
@@ -330,4 +371,40 @@ func (g *gitWorker) writeGitFile(path string, contents []byte) error {
 	}
 	_, err = file.Write(contents)
 	return err
+}
+
+func doGitCmd(dir string, username string, password string, args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	pipe, err := cmd.StdinPipe()
+	if err != nil {
+		return "", fmt.Errorf("Cannot open stdin: %v", err)
+	}
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("Unable to run git: %v", err)
+	}
+	// TODO: this doesn't feel right, should I sleep before checking out, etc
+	if username != "" && strings.HasSuffix(out.String(), "Username:") {
+		_, err = pipe.Write([]byte(username + "\n"))
+	}
+	if password != "" && err == nil && strings.HasSuffix(out.String(), "Password:") {
+		_, err = pipe.Write([]byte(password + "\n"))
+	}
+	if err == nil {
+		// TODO: this needs to time out after so long
+		err = cmd.Wait()
+	}
+	if err != nil {
+		if dir == "" {
+			return "", fmt.Errorf("Error running git: %v. Output:\n%v", err, out.String())
+		} else {
+			return "", fmt.Errorf("Error running git in %v: %v. Output:\n%v", dir, err, out.String())
+		}
+	}
+	return out.String(), nil
 }

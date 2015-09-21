@@ -35,10 +35,7 @@ value expanded as necessary and no generics. Example response:
       "tags": ["dallas-dmz-1"],
       "credentials": {
         "user": "myuser",
-        "pass": "mypass",
-        "prompt": {
-          "ends_with": "#"
-        }
+        "pass": "mypass"
       }
     },
     "job": {
@@ -48,9 +45,6 @@ value expanded as necessary and no generics. Example response:
       },
       "command": {
         "inline": ["show run"]
-      },
-      "prompt": {
-        "ends_with": "#"
       }
     }
   },

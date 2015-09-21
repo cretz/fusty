@@ -105,18 +105,11 @@ local job stores. Below is an example of a local job store configuration in JSON
 
       // The "default" generic is applied to all jobs that don't specify their own generic
       "default": {
-
-        // Prompt is just one of many settings that can be set per job. They are not all listed here
-        "prompt": {
-          "ends_with": "#"
-        }
       },
 
       // This is an example of a specific generic
-      "caret_prompt": {
-        "prompt": {
-          "ends_with": ">"
-        }
+      "some_other_generic": {
+        // Any contents a job can have
       }
     },
 

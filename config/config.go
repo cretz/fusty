@@ -106,7 +106,7 @@ type DeviceStoreLocal struct {
 
 type Device struct {
 	Generic            string `json:"generic"`
-	Host               string `json:"protocol"`
+	Host               string `json:"host"`
 	*DeviceProtocol    `json:"protocol"`
 	Tags               []string `json:"tags"`
 	*DeviceCredentials `json:"credentials"`

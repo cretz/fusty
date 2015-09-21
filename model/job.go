@@ -1,7 +1,6 @@
 package model
 
 import (
-	"errors"
 	"fmt"
 	"gitlab.com/cretz/fusty/config"
 )
@@ -39,5 +38,6 @@ func (d *Job) DeepCopy() *Job {
 }
 
 func (d *Job) Validate() []error {
-	return []error{errors.New("Not implemented")}
+	// TODO: There is nothing else to validate right now
+	return nil
 }

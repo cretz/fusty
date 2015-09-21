@@ -33,7 +33,7 @@ func (d *Device) ApplyConfig(conf *config.Device) error {
 			if _, ok := d.DeviceProtocol.(SshDeviceProtocol); !ok {
 				d.DeviceProtocol = &SshDeviceProtocol{Port: 22}
 			}
-			if conf.DeviceProtocolSsh.Port > 0 {
+			if conf.DeviceProtocolSsh != nil && conf.DeviceProtocolSsh.Port > 0 {
 				d.DeviceProtocol.(*SshDeviceProtocol).Port = conf.Port
 			}
 		default:

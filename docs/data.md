@@ -5,6 +5,25 @@ The only currently supported data store for Fusty backups is Git. This is config
 
 ## Git
 
+### Settings
+
+These are the settings for the git data store. They can be set in the [configuration](configuration.md) file. The
+details of the settings and the defaults are below.
+
+* `url` - Required URL to git repository. This can be a local repository or an HTTP(s) one. Currently SSH repositories
+  are unsupported.
+* `pool_size` - Optional number of git clones to maintain to help parallelize writes. Default is 20.
+* `structure` - Optional collection of structure approaches to take (see below). Default is `by_device`.
+* `include_readme_overviews` - Optional. Pass false in to avoid README overviews (see below). Default is true.
+* `data_dir` - Optional base directory to store pooled clones under. Default is the current working directory (i.e. the
+  directory the command was run from, not necessarily the directory that contains the binary). Note, this directory must
+  be cleaned of all cloned repositories if the repository changes (they start with "pool").
+* `user` - Optional user for communicating with git remote.
+  * `friendly_name` - Optional friendly name to commit as. Default is no friendly name.
+  * `email` - Optional email to commit as. Default is no email.
+  * `name` - Optional username to commit as. Default is no authentication. This is required if `pass` exists.
+  * `pass` - Optional password to commit with. Default is no authentication.
+
 ### Structure
 
 When storing backups in the Git repository, Fusty puts the result of each job in the same file. Depending upon the

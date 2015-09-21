@@ -68,17 +68,23 @@ func NewController(conf *config.Config) (*Controller, error) {
 		controller.errLog = log.New(os.Stderr, "", log.LstdFlags)
 		controller.outLog = log.New(os.Stdout, "", log.LstdFlags)
 	}
-	if jobStore, err := NewJobStoreFromConfig(conf.JobStore); err != nil {
+	if conf.JobStore == nil {
+		return nil, errors.New("Job store configuration not found")
+	} else if jobStore, err := NewJobStoreFromConfig(conf.JobStore); err != nil {
 		return nil, fmt.Errorf("Unable to create job store: %v", err)
 	} else {
 		controller.JobStore = jobStore
 	}
-	if deviceStore, err := NewDeviceStoreFromConfig(conf.DeviceStore, controller.JobStore); err != nil {
+	if conf.DeviceStore == nil {
+		return nil, errors.New("Device store configuration not found")
+	} else if deviceStore, err := NewDeviceStoreFromConfig(conf.DeviceStore, controller.JobStore); err != nil {
 		return nil, fmt.Errorf("Unable to create device store: %v", err)
 	} else {
 		controller.DeviceStore = deviceStore
 	}
-	if dataStore, err := NewDataStoreFromConfig(conf.DataStore); err != nil {
+	if conf.DataStore == nil {
+		return nil, errors.New("Data store configuration not found")
+	} else if dataStore, err := NewDataStoreFromConfig(conf.DataStore); err != nil {
 		return nil, fmt.Errorf("Unable to create data store: %v", err)
 	} else {
 		controller.DataStore = dataStore

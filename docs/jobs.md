@@ -7,10 +7,9 @@ Jobs are executed on an interval in Fusty.
 These are the settings per job. They can be set in the [configuration](configuration.md) file. The details of the
 settings and the defaults are below.
 
-* `prompt` - No default, required
-  * `ends_with` - If present, this means that the prompt is reached when the end of the input is this string
 * `schedule` - No default, one of three formats required
-  * `cron` - [Cron-formatted](https://en.wikipedia.org/wiki/Cron#Format) string
+  * `cron` - [Cron-formatted](https://en.wikipedia.org/wiki/Cron#Format) string. Note, Fusty supports second-level
+    precision as an optional first value of the cron string. E.g. this runs every 45 seconds: `*/45 * * * * * *`.
   * `duration` - Simple duration string in the form of "number timeunit". The number must be a whole number and time
     unit can have a trailing "s" or not. The durations cannot have units greater than days. All intervals are aligned to
     1970-01-01.
