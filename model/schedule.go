@@ -9,7 +9,8 @@ import (
 
 type Schedule interface {
 	// Exclusive
-	LatestBetween(start time.Time, end time.Time) time.Time
+	Next(start time.Time) time.Time
+	DeepCopy() Schedule
 }
 
 func NewScheduleFromConfig(sched *config.JobSchedule) (Schedule, error) {
@@ -20,24 +21,26 @@ func NewScheduleFromConfig(sched *config.JobSchedule) (Schedule, error) {
 }
 
 type CronSchedule struct {
-	expr *cronexpr.Expression
+	originalString string
+	expr           *cronexpr.Expression
 }
 
 func NewCronSchedule(cron string) (*CronSchedule, error) {
 	if expr, err := cronexpr.Parse(cron); err != nil {
 		return nil, err
 	} else {
-		return &CronSchedule{expr: expr}, nil
+		return &CronSchedule{originalString: cron, expr: expr}, nil
 	}
 }
 
-func (c *CronSchedule) LatestBetween(start time.Time, end time.Time) time.Time {
-	previous := time.Time{}
-	for {
-		res := c.expr.Next(start)
-		if res.IsZero() || !res.Before(end) {
-			return previous
-		}
-		previous = res
+func (c *CronSchedule) Next(start time.Time) time.Time {
+	return c.expr.Next(start)
+}
+
+func (c *CronSchedule) DeepCopy() Schedule {
+	ret, err := NewCronSchedule(c.originalString)
+	if err != nil {
+		panic(err)
 	}
+	return ret
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"gitlab.com/cretz/fusty/model"
+	"log"
 	"time"
 )
 
@@ -23,6 +24,9 @@ func runExecution(execution *model.Execution) *result {
 		deviceName:     execution.Device.Name,
 		jobTimestamp:   execution.Timestamp,
 		startTimestamp: time.Now().Unix(),
+	}
+	if Verbose {
+		log.Printf("Running execution: %v", res)
 	}
 	sess, err := newSession(execution.Device)
 	if err != nil {
@@ -50,6 +54,9 @@ func runJob(sess session, job *model.Job) ([]byte, error) {
 	for _, command := range job.CommandSet.Commands {
 		bytes, commandErr := sess.run(command)
 		if len(bytes) > 0 {
+			if Verbose {
+				log.Printf("Command '%v' result: %v", command, string(bytes))
+			}
 			if _, writeErr := buf.Write(bytes); writeErr != nil {
 				// We know this will get overridden by command err if present which is a good thing
 				err = fmt.Errorf("Unable to write to buffer: %v", writeErr)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"gitlab.com/cretz/fusty/config"
 	"gitlab.com/cretz/fusty/model"
+	"log"
 )
 
 type JobStore interface {
@@ -25,6 +26,9 @@ type localJobStore struct {
 }
 
 func newLocalJobStore(conf *config.JobStoreLocal) (*localJobStore, error) {
+	if Verbose {
+		log.Printf("Loading jobs from config")
+	}
 	store := &localJobStore{jobs: make(map[string]*model.Job)}
 	errs := []error{}
 	for name, confJob := range conf.Jobs {

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"gitlab.com/cretz/fusty/model"
+	"log"
 	"sync"
 	"time"
 )
@@ -47,17 +48,22 @@ func (j *schedulerLocal) NextExecution(tags []string, before time.Time) *model.E
 
 func (j *schedulerLocal) addDeviceJob(dev *model.Device) error {
 	for _, job := range dev.Jobs {
-		dev := &deviceJob{
-			Device:  dev,
-			Job:     job,
-			lastRun: time.Now(),
+		devJob := &deviceJob{
+			Device:      dev,
+			Job:         job,
+			lastRun:     time.Now(),
+			lastRunLock: &sync.Mutex{},
 		}
-		if len(dev.Tags) == 0 {
-			j.addDeviceJobToTag("", dev)
+		if len(devJob.Tags) == 0 {
+			j.addDeviceJobToTag("", devJob)
 		} else {
-			for _, tag := range dev.Tags {
-				j.addDeviceJobToTag(tag, dev)
+			for _, tag := range devJob.Tags {
+				j.addDeviceJobToTag(tag, devJob)
 			}
+		}
+		if Verbose {
+			log.Printf("Added job %v for device %v which will likely run next at %v",
+				devJob.Job.Name, devJob.Device.Name, devJob.Job.Next(devJob.lastRun))
 		}
 	}
 	return nil
@@ -74,12 +80,17 @@ type deviceJob struct {
 	lastRunLock *sync.Mutex
 }
 
-func (d deviceJob) nextRun(before time.Time) time.Time {
+func (d *deviceJob) nextRun(before time.Time) time.Time {
 	d.lastRunLock.Lock()
 	defer d.lastRunLock.Unlock()
-	ret := d.Job.LatestBetween(d.lastRun, before)
-	if !ret.IsZero() {
-		d.lastRun = ret
+	after := time.Now()
+	if d.lastRun.After(after) {
+		after = d.lastRun
 	}
-	return ret
+	ret := d.Job.Next(after)
+	if ret.After(after) && ret.Before(before) {
+		d.lastRun = ret
+		return ret
+	}
+	return time.Time{}
 }

@@ -11,6 +11,9 @@ import (
 	"strconv"
 )
 
+// TODO: maybe remove this as a global var
+var Verbose bool
+
 type Controller struct {
 	conf   *config.Config
 	errLog *log.Logger
@@ -40,6 +43,9 @@ func RunController(configFilename string) error {
 		}
 	} else {
 		conf = config.NewDefault()
+	}
+	if Verbose {
+		log.Printf("Creating controller with configuration: %v", conf)
 	}
 	cont, err := NewController(conf)
 	if err != nil {

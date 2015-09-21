@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"gitlab.com/cretz/fusty/model"
 	"golang.org/x/crypto/ssh"
+	"log"
 	"strconv"
 )
 
@@ -19,28 +20,26 @@ type session interface {
 }
 
 func newSession(device *model.Device) (session, error) {
-	switch device.DeviceProtocol.(type) {
-	case model.SshDeviceProtocol:
-		return &sshSession{}, nil
-	default:
-		return nil, errors.New("Unrecognized device protocol")
+	if device.DeviceProtocol.SshDeviceProtocol == nil {
+		return nil, errors.New("Unable to find SSH settings")
 	}
+	return &sshSession{}, nil
 }
 
 type sshSession struct {
+	device  *model.Device
 	session *ssh.Session
 }
 
 func (s *sshSession) authenticate(device *model.Device) error {
-	sshProtocol, ok := device.DeviceProtocol.(model.SshDeviceProtocol)
-	if !ok {
-		return errors.New("Invalid protocol")
-	}
 	sshConf := &ssh.ClientConfig{
 		User: device.DeviceCredentials.User,
 		Auth: []ssh.AuthMethod{ssh.Password(device.DeviceCredentials.Pass)},
 	}
-	hostPort := device.Host + ":" + strconv.Itoa(sshProtocol.Port)
+	hostPort := device.Host + ":" + strconv.Itoa(device.DeviceProtocol.SshDeviceProtocol.Port)
+	if Verbose {
+		log.Printf("Starting SSH session on %v for user %v", hostPort, device.DeviceCredentials.User)
+	}
 	client, err := ssh.Dial("tcp", hostPort, sshConf)
 	if err != nil {
 		return fmt.Errorf("Unable to connect to %v: %v", hostPort, err)
@@ -49,6 +48,7 @@ func (s *sshSession) authenticate(device *model.Device) error {
 	if err != nil {
 		return fmt.Errorf("Unable to initiate session on %v: %v", hostPort, err)
 	}
+	s.device = device
 	s.session = session
 	return nil
 }
@@ -63,6 +63,9 @@ func (s *sshSession) close() error {
 func (s *sshSession) run(cmd string) ([]byte, error) {
 	if s.session == nil {
 		return nil, errors.New("Session not started")
+	}
+	if Verbose {
+		log.Printf("Running SSH command on %v: %v", s.device.Host, cmd)
 	}
 	return s.session.CombinedOutput(cmd)
 }

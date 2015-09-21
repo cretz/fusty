@@ -6,7 +6,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"gitlab.com/cretz/fusty/config"
 	"io/ioutil"
-	"os/exec"
+	"log"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,17 +14,20 @@ import (
 )
 
 func TestSimpleEndToEnd(t *testing.T) {
-	Convey("Given we are running a mock SSH server, do it all (TODO: break up)", t, func() {
+	Convey("Given we are running a mock SSH server, do it all (TODO: break up)", t, func(c C) {
+		log.Print("Starting a device")
 		device := startDefaultDevice()
 		Reset(device.stop)
 
 		// Initialize the git path
-		cleanAndReinitializeGitRepo()
+		log.Print("Reinitializing git")
+		cleanAndReinitializeGitRepo(c)
 
 		// This config already has the data store set up properly
 		conf := newWorkingConfig()
 
 		// Set up one job every 3 seconds
+		conf.JobStore.JobStoreLocal.JobGenerics = map[string]*config.Job{}
 		conf.JobStore.JobStoreLocal.Jobs = map[string]*config.Job{
 			"simple": &config.Job{
 				JobSchedule: &config.JobSchedule{
@@ -37,6 +40,7 @@ func TestSimpleEndToEnd(t *testing.T) {
 		}
 
 		// Give it the device we just started
+		conf.DeviceStore.DeviceStoreLocal.DeviceGenerics = map[string]*config.Device{}
 		conf.DeviceStore.DeviceStoreLocal.Devices = map[string]*config.Device{
 			"local": &config.Device{
 				Host: device.addr().IP.String(),
@@ -56,43 +60,62 @@ func TestSimpleEndToEnd(t *testing.T) {
 			},
 		}
 
-		// Fire up the controller (TODO: stream output of this)
+		// Fire up the controller
+		log.Print("Starting controller")
 		var controllerCmd *fustyCmd
-		defer controllerCmd.cmd.Stop()
-		go func() {
-			withTempConfig(conf, func(confFile string) {
-				controllerCmd = runFusty("controller", "-config", confFile)
-				out, _ := c.cmd.CombinedOutput()
-				Printf("FUSTY CONTROLLER OUT: %v", string(out))
-				So(c.cmd.Success(), ShouldBeTrue)
-			})
+		defer func() {
+			if controllerCmd != nil && !controllerCmd.Exited() {
+				controllerCmd.Stop()
+			}
 		}()
+		confFile, err := writeConfigFile(conf)
+		So(err, ShouldBeNil)
+		bytes, err := conf.ToBytesPretty()
+		So(err, ShouldBeNil)
+		log.Printf("Running controller with config: %v", string(bytes))
+		controllerCmd = runFusty(c, "controller", "-config", confFile.Name(), "-verbose")
+		go controllerCmd.RunAndStreamToOutput("Controller out: ")
+		// Wait just a sec and confirm it's still running
+		time.Sleep(time.Duration(1) * time.Second)
+		So(controllerCmd.Exited(), ShouldBeFalse)
 
 		// Fire up the worker
+		log.Print("Starting worker")
 		var workerCmd *fustyCmd
-		defer workerCmd.cmd.Stop()
-		go func() {
-			withTempConfig(conf, func(confFile string) {
-				args := []string{
-					"worker",
-					"-controller",
-					device.listener.Addr().String(),
-					// We'll sleep for 20 minutes, because basically the worker will fetch work right from
-					// the beginning and we only want to check the first run
-					"-sleep",
-					"1200",
-				}
-				controllerCmd = runFusty()
-				out, _ := c.cmd.CombinedOutput()
-				Printf("FUSTY WORKER OUT: %v", string(out))
-				So(c.cmd.Success(), ShouldBeTrue)
-			})
+		defer func() {
+			if workerCmd != nil && !workerCmd.Exited() {
+				workerCmd.Stop()
+			}
 		}()
+		args := []string{
+			"worker",
+			"-controller",
+			"http://127.0.0.1:9400",
+			// We'll sleep for 20 minutes, because basically the worker will fetch work right from
+			// the beginning and we only want to check the first run
+			"-sleep",
+			"1200",
+			"-verbose",
+			// We give a max of 1 because we only care about 1 execution
+			"-maxjobs",
+			"1",
+		}
+		workerCmd = runFusty(c, args...)
+		go workerCmd.RunAndStreamToOutput("Worker out: ")
 
 		// Wait for 5 seconds and shut em down...
-		time.Sleep(time.Duration(5) * time.Second)
-		workerCmd.cmd.Stop()
-		controllerCmd.cmd.Stop()
+		log.Print("Waiting 15 seconds")
+		time.Sleep(time.Duration(15) * time.Second)
+		log.Print("Shutting down worker")
+		c.So(workerCmd.Stop(), ShouldBeNil)
+		log.Print("Shutting down controller")
+		c.So(controllerCmd.Stop(), ShouldBeNil)
+		log.Print("Now checking status codes")
+		time.Sleep(time.Duration(1) * time.Second)
+		So(controllerCmd.Exited(), ShouldBeTrue)
+		So(workerCmd.Exited(), ShouldBeTrue)
+
+		So("We are done", ShouldBeNil)
 
 		// Now check that the git repository has a commit like we expect
 		authorName := runInDir(gitRepoDirectory, "git", "log", "-1", "--pretty=%an")
@@ -125,11 +148,15 @@ func startDefaultDevice() *mockDevice {
 		username: "johndoe",
 		password: "secretpass",
 		responses: map[string]string{
-			"command2": strings.Repeat("This is a command response\n", 50),
+			"command1": strings.Repeat("This is a command1 response\n", 5),
+			"command2": strings.Repeat("This is a command2 response\n", 5),
+		},
+		responseStatuses: map[string]int{
+			"command1": 0,
+			"command2": 0,
 		},
 	}
-	mock, err := device.listen()
-	So(err, ShouldBeNil)
+	So(device.listen(), ShouldBeNil)
 	go device.acceptUntilError()
-	return mock
+	return device
 }

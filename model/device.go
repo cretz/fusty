@@ -7,19 +7,19 @@ import (
 )
 
 type Device struct {
-	Name string `json:"name"`
-	Host string `json:"ip"`
-	DeviceProtocol
-	Tags []string `json:"tags"`
-	*DeviceCredentials
-	Jobs map[string]*Job `json:"jobs"`
+	Name               string `json:"name"`
+	Host               string `json:"host"`
+	*DeviceCredentials `json:"credentials"`
+	*DeviceProtocol    `json:"protocol"`
+	Tags               []string        `json:"-"`
+	Jobs               map[string]*Job `json:"-"`
 }
 
 func NewDefaultDevice(name string) *Device {
 	return &Device{
 		Name:           name,
 		Host:           name,
-		DeviceProtocol: &SshDeviceProtocol{Port: 22},
+		DeviceProtocol: &DeviceProtocol{Type: "ssh", SshDeviceProtocol: &SshDeviceProtocol{Port: 22}},
 	}
 }
 
@@ -30,12 +30,12 @@ func (d *Device) ApplyConfig(conf *config.Device) error {
 	if conf.DeviceProtocol != nil {
 		switch conf.DeviceProtocol.Type {
 		case "ssh":
-			if _, ok := d.DeviceProtocol.(SshDeviceProtocol); !ok {
-				d.DeviceProtocol = &SshDeviceProtocol{Port: 22}
+			d.DeviceProtocol.Type = "ssh"
+			port := 22
+			if conf.DeviceProtocol.DeviceProtocolSsh != nil {
+				port = conf.DeviceProtocol.DeviceProtocolSsh.Port
 			}
-			if conf.DeviceProtocolSsh != nil && conf.DeviceProtocolSsh.Port > 0 {
-				d.DeviceProtocol.(*SshDeviceProtocol).Port = conf.Port
-			}
+			d.DeviceProtocol.SshDeviceProtocol = &SshDeviceProtocol{Port: port}
 		default:
 			return fmt.Errorf("Unrecognized protocol type: %v", conf.Type)
 		}
@@ -80,14 +80,16 @@ func (d *Device) Validate() []error {
 	return errs
 }
 
-type DeviceProtocol interface {
+type DeviceProtocol struct {
+	Type               string `json:"type"`
+	*SshDeviceProtocol `json:"ssh,omitempty"`
 }
 
 type SshDeviceProtocol struct {
-	Port int
+	Port int `json:"port"`
 }
 
 type DeviceCredentials struct {
-	User string
-	Pass string
+	User string `json:"user"`
+	Pass string `json:"pass"`
 }

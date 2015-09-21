@@ -6,9 +6,9 @@ import (
 )
 
 type Job struct {
-	Name string
-	*CommandSet
-	Schedule
+	Name        string `json:"name"`
+	*CommandSet `json:"command_set"`
+	Schedule    `json:"-"`
 }
 
 func NewDefaultJob(name string) *Job {
@@ -33,11 +33,18 @@ func (j *Job) ApplyConfig(conf *config.Job) error {
 	return nil
 }
 
-func (d *Job) DeepCopy() *Job {
-	panic("TODO")
+func (j *Job) DeepCopy() *Job {
+	// github.com/mitchellh/copystructure was failing because it could not traverse the pointer
+	// so we have to do this ourselves.
+	// TODO: write unit tests to confirm functionality doesn't change
+	return &Job{
+		Name:       j.Name,
+		CommandSet: j.CommandSet.DeepCopy(),
+		Schedule:   j.Schedule.DeepCopy(),
+	}
 }
 
-func (d *Job) Validate() []error {
+func (j *Job) Validate() []error {
 	// TODO: There is nothing else to validate right now
 	return nil
 }

@@ -19,6 +19,9 @@ import (
 	"time"
 )
 
+// TODO: maybe remove this as a global var
+var Verbose bool
+
 type Worker struct {
 	conf                      *Config
 	runningExecutionCountLock *sync.Mutex
@@ -40,6 +43,9 @@ func RunWorker(conf *Config) error {
 	conf.ControllerUrl = strings.TrimRight(conf.ControllerUrl, "/")
 
 	// We need to ping the controller to make sure it's good
+	if Verbose {
+		log.Printf("Pinging worker at %v/worker/ping", conf.ControllerUrl)
+	}
 	if resp, err := http.Get(conf.ControllerUrl + "/worker/ping"); err != nil {
 		return fmt.Errorf("Unable to contact controller at %v/worker/ping: %v", conf.ControllerUrl, err)
 	} else if resp.StatusCode != http.StatusOK {
@@ -93,6 +99,9 @@ func (w *Worker) Start() {
 		w.tick()
 		// We will sleep half the amount of time range configured
 		// to fetch jobs for.
+		if Verbose {
+			log.Printf("Waiting %v seconds before checking for more jobs", w.conf.SleepSeconds/2)
+		}
 		time.Sleep(time.Duration(w.conf.SleepSeconds/2) * time.Second)
 	}
 }
@@ -105,7 +114,13 @@ func (w *Worker) tick() {
 	jobsNeeded := w.conf.MaxJobs - w.runningExecutionCount
 	w.runningExecutionCountLock.Unlock()
 	if jobsNeeded <= 0 {
+		if Verbose {
+			log.Print("Job queue already at max limit, skipping work-check for controller")
+		}
 		return
+	}
+	if Verbose {
+		log.Print("Checking with controller for work to do")
 	}
 	// Ask for as many jobs as we need
 	executions, err := w.nextExecutions(jobsNeeded)
@@ -115,6 +130,9 @@ func (w *Worker) tick() {
 		return
 	}
 	// Schedule em all
+	if Verbose {
+		log.Printf("Found %v executions to run", len(executions))
+	}
 	for _, execution := range executions {
 		w.scheduleExecution(execution)
 	}
@@ -133,6 +151,9 @@ func (w *Worker) nextExecutions(jobsNeeded int) ([]*model.Execution, error) {
 		panic(fmt.Errorf("Unable to parse URL: %v", err))
 	}
 	url.RawQuery = queryValues.Encode()
+	if Verbose {
+		log.Printf("Running GET on %v", url.String())
+	}
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		// This is panic worthy
@@ -154,8 +175,11 @@ func (w *Worker) nextExecutions(jobsNeeded int) ([]*model.Execution, error) {
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("Failed to retrieve next jobs, status %v, body: %v", resp.Status, string(body))
 	}
+	if Verbose {
+		log.Printf("Got execution body from controller: %v", string(body))
+	}
 	executions := make([]*model.Execution, 0)
-	if err := json.Unmarshal(body, executions); err != nil {
+	if err := json.Unmarshal(body, &executions); err != nil {
 		return nil, fmt.Errorf("Unable to unmarshal JSON: %v. Body: %v", err, string(body))
 	}
 	return executions, nil
@@ -205,6 +229,10 @@ func (w *Worker) runExecutionAndPostResult(execution *model.Execution) {
 	}
 	if postFailedErr == nil && result.failure != nil {
 		postFailedErr = formWriter.WriteField("failure", result.failure.Error())
+		if Verbose {
+			w.errLog.Printf("Job %v on device %v at expected time %v failed. Failure: %v",
+				result.jobName, result.deviceName, time.Unix(result.jobTimestamp, 0), result.failure)
+		}
 	}
 	if postFailedErr == nil && len(result.file) > 0 {
 		if file, err := formWriter.CreateFormFile("file", result.jobName); err != nil {

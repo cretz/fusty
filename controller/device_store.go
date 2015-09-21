@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"gitlab.com/cretz/fusty/config"
 	"gitlab.com/cretz/fusty/model"
+	"log"
 )
 
 type DeviceStore interface {
@@ -25,13 +26,16 @@ type localDeviceStore struct {
 }
 
 func newLocalDeviceStore(conf *config.DeviceStoreLocal, jobStore JobStore) (*localDeviceStore, error) {
+	if Verbose {
+		log.Printf("Loading devices from config")
+	}
 	store := &localDeviceStore{devices: make(map[string]*model.Device)}
 	errs := []error{}
 	for name, confDevice := range conf.Devices {
 		device := model.NewDefaultDevice(name)
 		// Add all of the jobs
 		device.Jobs = make(map[string]*model.Job)
-		for name, _ := range device.Jobs {
+		for name, _ := range confDevice.Jobs {
 			job := jobStore.AllJobs()[name]
 			if job == nil {
 				job = model.NewDefaultJob(name)

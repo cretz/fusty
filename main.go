@@ -36,11 +36,13 @@ func Run(command string, args ...string) error {
 func runController(args ...string) error {
 	flags := flag.NewFlagSet("flags", flag.ContinueOnError)
 	configFile := flags.String("config", "", "Configuration file")
+	verbose := flags.Bool("verbose", false, "Verbose")
 	if err := flags.Parse(args); err != nil {
 		return fmt.Errorf("Error parsing arguments: %v", err)
 	} else if flags.NArg() != 0 {
-		return errors.New("Controller only accepts single config-file argument at most")
+		return errors.New("Controller only accepts config and/or verbose arguments at most")
 	}
+	controller.Verbose = *verbose
 	return controller.RunController(*configFile)
 }
 
@@ -53,12 +55,14 @@ func runWorker(args ...string) error {
 	flags.IntVar(&conf.SleepSeconds, "sleep", 15, "Sleep seconds")
 	flags.IntVar(&conf.MaxJobs, "maxjobs", 2000, "Max running jobs")
 	flags.IntVar(&conf.TimeoutSeconds, "timeout", 3, "Controller HTTP timeout seconds")
+	verbose := flags.Bool("verbose", false, "Verbose")
 	if err := flags.Parse(args); err != nil {
 		return fmt.Errorf("Error parsing arguments: %v", err)
 	} else if flags.NArg() != 0 {
 		return fmt.Errorf("Unrecognized extra parameter: %v", flags.Arg(0))
 	}
 	conf.Tags = tags
+	worker.Verbose = *verbose
 	return worker.RunWorker(conf)
 }
 

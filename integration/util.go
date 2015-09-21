@@ -4,6 +4,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"gitlab.com/cretz/fusty/config"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -106,24 +107,41 @@ func init() {
 	}
 }
 
-func cleanAndReinitializeGitRepo() {
-	So(os.RemoveAll(gitRepoDirectory), ShouldBeNil)
-	So(os.MkdirAll(gitRepoDirectory, os.ModePerm), ShouldBeNil)
-	cmd := exec.Command("git", "init", gitRepoDirectory)
+func cleanAndReinitializeGitRepo(c C) {
+	c.So(os.RemoveAll(gitRepoDirectory), ShouldBeNil)
+	c.So(os.MkdirAll(gitRepoDirectory, os.ModePerm), ShouldBeNil)
+	cmd := exec.Command("git", "init", "--bare", gitRepoDirectory)
 	_, err := cmd.CombinedOutput()
-	So(err, ShouldBeNil)
+	c.So(err, ShouldBeNil)
+	// We have to create a master branch which means we have to clone, commit empty, push a master, and then delete
+	tempDir := filepath.Join(tempDirectory, "gittemp")
+	c.So(os.RemoveAll(tempDir), ShouldBeNil)
+	defer os.RemoveAll(tempDir)
+	c.So(os.MkdirAll(tempDir, os.ModePerm), ShouldBeNil)
+	cmd = exec.Command("git", "clone", gitRepoDirectory, tempDir)
+	cmd.Dir = tempDir
+	_, err = cmd.CombinedOutput()
+	c.So(err, ShouldBeNil)
+	cmd = exec.Command("git", "commit", "--allow-empty", "-m", "Creating master branch")
+	cmd.Dir = tempDir
+	_, err = cmd.CombinedOutput()
+	c.So(err, ShouldBeNil)
+	cmd = exec.Command("git", "push", "origin", "master")
+	cmd.Dir = tempDir
+	_, err = cmd.CombinedOutput()
+	c.So(err, ShouldBeNil)
 }
 
 func tearDown() {
 	os.RemoveAll(tempDirectory)
 }
 
-func withTempConfig(conf *config.Config, f func(string)) {
+func withTempConfig(c C, conf *config.Config, f func(string)) {
 	confFile, err := writeConfigFile(conf)
 	if confFile != nil {
 		defer os.Remove(confFile.Name())
 	}
-	So(err, ShouldBeNil)
+	c.So(err, ShouldBeNil)
 	f(confFile.Name())
 }
 
@@ -141,33 +159,46 @@ func writeConfigFile(conf *config.Config) (f *os.File, err error) {
 }
 
 type fustyCmd struct {
-	cmd fustyCmdAbstraction
+	fustyCmdAbstraction
 }
 
 type fustyCmdAbstraction interface {
+	RunAndStreamToOutput(prefix string) error
 	CombinedOutput() ([]byte, error)
+	Exited() bool
 	Success() bool
 	Stop() error
 }
 
-func runFusty(args ...string) *fustyCmd {
+func runFusty(c C, args ...string) *fustyCmd {
 	if coverageEnabled {
 		// TODO: &fustyCmd{cmd: &fustyCmdLocal{args: args}}
 		// We really want this for code coverage
 	}
-	return &fustyCmd{cmd: createExternalCmd(exec.Command(filepath.Join(baseDirectory, "fusty"), args...))}
+	return &fustyCmd{
+		fustyCmdAbstraction: createExternalCmd(c, exec.Command(filepath.Join(baseDirectory, "fusty"), args...)),
+	}
 }
 
 type fustyCmdExternal struct {
+	c C
 	*exec.Cmd
 	lock *sync.Mutex
 }
 
-func createExternalCmd(cmd *exec.Cmd) *fustyCmdExternal {
+func createExternalCmd(c C, cmd *exec.Cmd) *fustyCmdExternal {
 	return &fustyCmdExternal{
+		c:    c,
 		Cmd:  cmd,
 		lock: &sync.Mutex{},
 	}
+}
+
+func (f *fustyCmdExternal) RunAndStreamToOutput(prefix string) error {
+	out := &stdoutWriter{prefix: prefix}
+	f.Cmd.Stdout = out
+	f.Cmd.Stderr = out
+	return f.Cmd.Run()
 }
 
 func (f *fustyCmdExternal) CombinedOutput() ([]byte, error) {
@@ -176,17 +207,23 @@ func (f *fustyCmdExternal) CombinedOutput() ([]byte, error) {
 	return f.Cmd.CombinedOutput()
 }
 
+func (f *fustyCmdExternal) Exited() bool {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	return f.Cmd.ProcessState != nil && f.Cmd.ProcessState.Exited()
+}
+
 func (f *fustyCmdExternal) Success() bool {
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	So(f.Cmd.ProcessState, ShouldNotBeNil)
+	f.c.So(f.Cmd.ProcessState, ShouldNotBeNil)
 	return f.Cmd.ProcessState.Success()
 }
 
-func (f *fustyCmdExternal) Stop() bool {
+func (f *fustyCmdExternal) Stop() error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	So(f.Cmd.Process, ShouldNotBeNil)
+	f.c.So(f.Cmd.Process, ShouldNotBeNil)
 	return f.Cmd.Process.Kill()
 }
 
@@ -209,9 +246,18 @@ func (f *fustyCmdLocal) Stop() error {
 }
 
 func runInDir(dir string, cmd string, args ...string) string {
-	cmd := exec.Command(cmd, args...)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
+	command := exec.Command(cmd, args...)
+	command.Dir = dir
+	out, err := command.CombinedOutput()
 	So(err, ShouldBeNil)
 	return strings.TrimSpace(string(out))
+}
+
+type stdoutWriter struct {
+	prefix string
+}
+
+func (s *stdoutWriter) Write(p []byte) (n int, err error) {
+	log.Print(s.prefix + strings.TrimSpace(string(p)))
+	return len(p), nil
 }

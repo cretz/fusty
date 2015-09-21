@@ -81,6 +81,9 @@ func newGitDataStore(conf *config.DataStoreGit) (*gitDataStore, error) {
 	if err := dataStore.ValidateAndApplyDefaults(); err != nil {
 		return nil, err
 	}
+	if Verbose {
+		log.Printf("Creating %v git data store copies for the pool", conf.PoolSize)
+	}
 	for i := 0; i < conf.PoolSize; i++ {
 		worker := &gitWorker{
 			dir:       path.Join(conf.DataDir, "pool"+strconv.Itoa(i+1)),
@@ -91,7 +94,7 @@ func newGitDataStore(conf *config.DataStoreGit) (*gitDataStore, error) {
 		}
 		go worker.run()
 	}
-	return nil, errors.New("Not implemented")
+	return dataStore, nil
 }
 
 func (g *gitDataStore) ValidateAndApplyDefaults() error {
@@ -156,6 +159,9 @@ func (g *gitDataStore) password() string {
 func (g *gitDataStore) Store(job *DataStoreJob) {
 	// TODO: queue up readme overview...
 	// Queue up the write
+	if Verbose {
+		log.Printf("Preparing to store job: %v", job)
+	}
 	g.writesLock.Lock()
 	key := job.key()
 	// First, if it's running right now we put it in the waiting section
@@ -271,19 +277,31 @@ func (g *gitWorker) pushJobs(jobs []*DataStoreJob) {
 }
 
 func (g *gitWorker) initialize() error {
+	// Create the directory if needed
+	if err := os.MkdirAll(g.dir, os.ModePerm); err != nil {
+		return fmt.Errorf("Unable to initialize worker: %v", err)
+	}
 	// TODO: this needs to be cleaned if they change repo info, right? Or can we ask them to delete data dir
 	if _, err := os.Stat(filepath.Join(g.dir, ".git")); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("Unable to read .git at %v: %v", g.dir, err)
 	} else if os.IsNotExist(err) {
 		// We need to git clone in to the directory
+		if Verbose {
+			log.Printf("Cloning into %v", g.dir)
+		}
 		if out, err := g.doGitCmd("clone", g.dataStore.conf.Url, g.dir); err != nil {
 			return fmt.Errorf("Unable to clone from %v: %v. Output:\n%v", g.dataStore.conf.Url, err, out)
 		}
+	} else if Verbose {
+		log.Printf("Not cloning fresh into %v because .git folder already exists", g.dir)
 	}
 	return g.clean()
 }
 
 func (g *gitWorker) clean() error {
+	if Verbose {
+		log.Printf("Performing hard reset and pull in %v", g.dir)
+	}
 	// Simple reset and pull
 	if out, err := g.doGitCmd("reset", "--hard"); err != nil {
 		return fmt.Errorf("Unable to git reset --hard in %v: %v. Output:\n%v", g.dir, err, out)
@@ -342,6 +360,9 @@ func (g *gitWorker) commitJob(job *DataStoreJob) error {
 		job.StartTime.Format(time.ANSIC), job.EndTime.Format(time.ANSIC), job.EndTime.Sub(job.StartTime),
 	)
 	// We --allow-empty so we can commit a message even without contents/change
+	if Verbose {
+		log.Printf("Committing from %v with message:\n%v", g.dir, message)
+	}
 	if out, err := g.doGitCmd("commit", "--allow-empty", "-m", message); err != nil {
 		return fmt.Errorf("Unable to do git commit on %v: %v. Output:\n%v", g.dir, err, out)
 	}
@@ -349,6 +370,9 @@ func (g *gitWorker) commitJob(job *DataStoreJob) error {
 }
 
 func (g *gitWorker) push() error {
+	if Verbose {
+		log.Printf("Pushing from %v", g.dir)
+	}
 	if out, err := g.doGitCmd("push"); err != nil {
 		return fmt.Errorf("Unable to do git push on %v: %v. Output:\n%v", g.dir, err, out)
 	}
@@ -361,6 +385,9 @@ func (g *gitWorker) doGitCmd(args ...string) (string, error) {
 
 func (g *gitWorker) writeGitFile(path string, contents []byte) error {
 	fullPath := filepath.Join(g.dir, path)
+	if Verbose {
+		log.Printf("Writing to file %v", fullPath)
+	}
 	dir, _ := filepath.Split(fullPath)
 	if err := os.MkdirAll(dir, os.FileMode(600)); err != nil {
 		return err

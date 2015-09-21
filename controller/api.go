@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"gitlab.com/cretz/fusty/model"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -66,6 +67,11 @@ func (c *Controller) apiWorkerNext(w http.ResponseWriter, req *http.Request) {
 			executions = append(executions, execution)
 		}
 	}
+	if Verbose {
+		log.Printf(
+			"Worker requested %v executions for tags %v at %v for the next %v seconds. Giving back %v executions: %v",
+			max, tags, time.Now().Unix(), seconds, len(executions), executions)
+	}
 	if len(executions) == 0 {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -121,8 +127,16 @@ func (c *Controller) apiWorkerComplete(w http.ResponseWriter, req *http.Request)
 		http.Error(w, "Failure and contents may not both be empty", http.StatusBadRequest)
 		return
 	}
-	// TODO: do not store failures, log em instead
-	c.DataStore.Store(job)
+	// We log failures, we do not store them
+	if job.Failure != "" {
+		c.errLog.Printf("Job %v on device %v at expected time %v failed. Failure: %v",
+			job.JobName, job.DeviceName, job.JobTime, job.Failure)
+	} else {
+		if Verbose {
+			log.Printf("Storing new job from worker: %v", job)
+		}
+		c.DataStore.Store(job)
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
