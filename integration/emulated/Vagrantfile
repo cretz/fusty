@@ -1,0 +1,11 @@
+Vagrant.configure(2) do |config|
+  config.vm.box = "file://./packer_virtualbox-ovf_virtualbox.box"
+  config.vm.network "public_network"
+  config.ssh.username = "gns3"
+  config.ssh.password = "gns3"
+  config.vm.provider "virtualbox" do |vb|
+    vb.gui = true
+    vb.memory = "4096"
+  end
+  config.vm.network "forwarded_port", guest: 8000, host: 8000
+end

@@ -1,2 +1,4 @@
 /fusty.exe
 /fusty
+/integration/emulated/.vagrant
+/integration/emulated/packer_virtualbox-ovf_virtualbox.box

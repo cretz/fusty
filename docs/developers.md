@@ -35,16 +35,4 @@ Besides unit and integration tests, all source must run and pass the following:
 
 ## Integration Testing
 
-This uses [GoConvey](https://github.com/smartystreets/goconvey). Simply run the following:
-
-    go get github.com/smartystreets/goconvey
-
-Then there is a binary at `$GOPATH/bin` called `goconvey`. Simply run it in the `fusty` directory and the results can
-be viewed at http://localhost:8080.
-
-Note, the integration tests currently work by executing the binary from the outside. This means that the "`go build`"
-has to be executed on every change manually. In the future this will be automated.
-
-Note, the integration tests currently work by executing the binary from the outside. This means that code coverage
-information inside the binary is unavailable. Programmatically invoking Fusty is a possible future feature to alleviate
-this.
+Please read the [integration documentation](../integration/README.md).

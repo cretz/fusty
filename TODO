@@ -13,6 +13,7 @@ Open Questions:
 * If they change the git location, should we require they delete the data dir since none of the git paths are right any more?
 * When workers are requesting tags of work, is it ok to get all for their first tag, then some for their next and so on,
   or should I balance across requested tags?
+* JSON sucks at config. Can I full-on switch to toml (https://github.com/BurntSushi/toml), or should I accept both?
 
 For MVP:
 * Embed web application:
