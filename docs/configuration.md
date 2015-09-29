@@ -120,7 +120,7 @@ local job stores. Below is an example of a local job store configuration in JSON
       "cisco_show_run" = {
 
         // The generic settings to inherit. Default is "default"
-        // "generic": "default"
+        // "generic": "default",
 
         // A required schedule indicating the frequency of execution
         "schedule": {
@@ -128,6 +128,9 @@ local job stores. Below is an example of a local job store configuration in JSON
           // Cron is one of the three supported schedule formats, see jobs documentation for more
           "cron": "0,30 * * * *"
         },
+        
+        // The type of job to execute. Default is "command".
+        // "type": "command",
 
         // The command(s) to execute and get results for
         "command": {

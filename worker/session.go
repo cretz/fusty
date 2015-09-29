@@ -3,8 +3,10 @@ package worker
 import (
 	"errors"
 	"fmt"
+	"github.com/pkg/sftp"
 	"gitlab.com/cretz/fusty/model"
 	"golang.org/x/crypto/ssh"
+	"io/ioutil"
 	"log"
 	"strconv"
 )
@@ -17,6 +19,8 @@ type session interface {
 
 	// Note, both bytes and error can be set
 	run(cmd string) ([]byte, error)
+
+	fetchFile(path string) ([]byte, error)
 }
 
 func newSession(device *model.Device) (session, error) {
@@ -27,8 +31,8 @@ func newSession(device *model.Device) (session, error) {
 }
 
 type sshSession struct {
-	device  *model.Device
-	session *ssh.Session
+	device *model.Device
+	client *ssh.Client
 }
 
 func (s *sshSession) authenticate(device *model.Device) error {
@@ -44,28 +48,43 @@ func (s *sshSession) authenticate(device *model.Device) error {
 	if err != nil {
 		return fmt.Errorf("Unable to connect to %v: %v", hostPort, err)
 	}
-	session, err := client.NewSession()
-	if err != nil {
-		return fmt.Errorf("Unable to initiate session on %v: %v", hostPort, err)
-	}
 	s.device = device
-	s.session = session
+	s.client = client
 	return nil
 }
 
 func (s *sshSession) close() error {
-	if s.session == nil {
-		return nil
+	if s.client != nil {
+		return s.client.Close()
 	}
-	return s.session.Close()
+	return nil
 }
 
 func (s *sshSession) run(cmd string) ([]byte, error) {
-	if s.session == nil {
-		return nil, errors.New("Session not started")
+	session, err := s.client.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("Unable to initiate session on %v: %v", s.device.Host, err)
 	}
+	defer session.Close()
 	if Verbose {
 		log.Printf("Running SSH command on %v: %v", s.device.Host, cmd)
 	}
-	return s.session.CombinedOutput(cmd)
+	return session.CombinedOutput(cmd)
+}
+
+func (s *sshSession) fetchFile(path string) ([]byte, error) {
+	client, err := sftp.NewClient(s.client)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to connect to SFTP on %v: %v", s.device.Host, err)
+	}
+	defer client.Close()
+	file, err := client.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to open %v via SFTP on %v: %v", path, s.device.Host, err)
+	}
+	bytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to read %v via SFTP on %v: %v", path, s.device.Host, err)
+	}
+	return bytes, nil
 }

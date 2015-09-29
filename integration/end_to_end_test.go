@@ -7,6 +7,7 @@ import (
 	"gitlab.com/cretz/fusty/config"
 	"io/ioutil"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,9 +16,9 @@ import (
 
 func TestSimpleEndToEnd(t *testing.T) {
 	Convey("Given we are running a mock SSH server, do it all (TODO: break up)", t, func(c C) {
-		log.Print("Starting a device")
-		device := startDefaultDevice()
-		Reset(device.stop)
+		// log.Print("Starting a device")
+		// device := startDefaultDevice()
+		// Reset(device.stop)
 
 		// Initialize the git path
 		log.Print("Reinitializing git")
@@ -28,31 +29,31 @@ func TestSimpleEndToEnd(t *testing.T) {
 
 		// Set up one job every 3 seconds
 		conf.JobStore.JobStoreLocal.JobGenerics = map[string]*config.Job{}
+		// Make it fetch the Juniper config
 		conf.JobStore.JobStoreLocal.Jobs = map[string]*config.Job{
 			"simple": &config.Job{
 				JobSchedule: &config.JobSchedule{
 					Cron: "*/3 * * * * * *",
 				},
-				JobCommand: &config.JobCommand{
-					Inline: []string{"command1", "command2"},
+				Type: "file",
+				JobFile: map[string]*config.JobFile{
+					"/config/juniper.conf.gz": &config.JobFile{Compression: "gzip"},
 				},
 			},
 		}
 
-		// Give it the device we just started
 		conf.DeviceStore.DeviceStoreLocal.DeviceGenerics = map[string]*config.Device{}
+		// Give it the Juniper VM
 		conf.DeviceStore.DeviceStoreLocal.Devices = map[string]*config.Device{
 			"local": &config.Device{
-				Host: device.addr().IP.String(),
+				Host: "127.0.0.1",
 				DeviceProtocol: &config.DeviceProtocol{
-					Type: "ssh",
-					DeviceProtocolSsh: &config.DeviceProtocolSsh{
-						Port: device.addr().Port,
-					},
+					Type:              "ssh",
+					DeviceProtocolSsh: &config.DeviceProtocolSsh{Port: 2222},
 				},
 				DeviceCredentials: &config.DeviceCredentials{
-					User: device.username,
-					Pass: device.password,
+					User: "root",
+					Pass: "Juniper",
 				},
 				Jobs: map[string]*config.Job{
 					"simple": &config.Job{},
@@ -72,11 +73,11 @@ func TestSimpleEndToEnd(t *testing.T) {
 		So(err, ShouldBeNil)
 		bytes, err := conf.ToBytesPretty()
 		So(err, ShouldBeNil)
-		log.Printf("Running controller with config: %v", string(bytes))
+		log.Printf("Running controller with config and waiting 3 seconds to start: %v", string(bytes))
 		controllerCmd = runFusty(c, "controller", "-config", confFile.Name(), "-verbose")
 		go controllerCmd.RunAndStreamToOutput("Controller out: ")
 		// Wait just a sec and confirm it's still running
-		time.Sleep(time.Duration(1) * time.Second)
+		time.Sleep(time.Duration(3) * time.Second)
 		So(controllerCmd.Exited(), ShouldBeFalse)
 
 		// Fire up the worker
@@ -104,8 +105,8 @@ func TestSimpleEndToEnd(t *testing.T) {
 		go workerCmd.RunAndStreamToOutput("Worker out: ")
 
 		// Wait for 5 seconds and shut em down...
-		log.Print("Waiting 15 seconds")
-		time.Sleep(time.Duration(15) * time.Second)
+		log.Print("Waiting 5 seconds")
+		time.Sleep(time.Duration(5) * time.Second)
 		log.Print("Shutting down worker")
 		c.So(workerCmd.Stop(), ShouldBeNil)
 		log.Print("Shutting down controller")
@@ -115,14 +116,18 @@ func TestSimpleEndToEnd(t *testing.T) {
 		So(controllerCmd.Exited(), ShouldBeTrue)
 		So(workerCmd.Exited(), ShouldBeTrue)
 
-		So("We are done", ShouldBeNil)
-
 		// Now check that the git repository has a commit like we expect
-		authorName := runInDir(gitRepoDirectory, "git", "log", "-1", "--pretty=%an")
+		// First, we have to do a fresh clone
+		gitAssertDir, err := ioutil.TempDir(tempDirectory, "git-assert-temp")
+		So(err, ShouldBeNil)
+		So(os.MkdirAll(gitAssertDir, os.ModePerm), ShouldBeNil)
+		runInDir(gitAssertDir, "git", "clone", gitRepoDirectory, gitAssertDir)
+
+		authorName := runInDir(gitAssertDir, "git", "log", "-1", "--pretty=%an")
 		So(authorName, ShouldEqual, "John Doe")
-		authorEmail := runInDir(gitRepoDirectory, "git", "log", "-1", "--pretty=%ae")
+		authorEmail := runInDir(gitAssertDir, "git", "log", "-1", "--pretty=%ae")
 		So(authorEmail, ShouldEqual, "jdoe@example.com")
-		commitComment := runInDir(gitRepoDirectory, "git", "log", "-1", "--pretty=%B")
+		commitComment := runInDir(gitAssertDir, "git", "log", "-1", "--pretty=%B")
 		So(commitComment, ShouldContainSubstring, "Job: simple\n")
 		So(commitComment, ShouldContainSubstring, "Device: local\n")
 		// TODO: Some extra validation of the values here?
@@ -130,16 +135,16 @@ func TestSimpleEndToEnd(t *testing.T) {
 		So(commitComment, ShouldContainSubstring, "Start Date:")
 		So(commitComment, ShouldContainSubstring, "End On:")
 		So(commitComment, ShouldContainSubstring, "Elapsed Time:")
-		filesText := runInDir(gitRepoDirectory, "git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD")
+		filesText := runInDir(gitAssertDir, "git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD")
 		filesUpdated := strings.Split(filesText, "\n")
 		// TODO: Fix this when checking for other types of git structures
 		So(len(filesUpdated), ShouldEqual, 1)
 		So(filesUpdated, ShouldContain, "by_device/local/simple")
 
 		// Now read the the file and make sure it looks right
-		fileBytes, err := ioutil.ReadFile(filepath.Join(gitRepoDirectory, "by_device/local/simple"))
+		fileBytes, err := ioutil.ReadFile(filepath.Join(gitAssertDir, "by_device/local/simple"))
 		So(err, ShouldBeNil)
-		So(string(fileBytes), ShouldContainSubstring, strings.Repeat("This is a command response\n", 50))
+		So(string(fileBytes), ShouldContainSubstring, "ge-0/0/0")
 	})
 }
 

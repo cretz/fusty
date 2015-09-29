@@ -250,6 +250,7 @@ func runInDir(dir string, cmd string, args ...string) string {
 	command.Dir = dir
 	out, err := command.CombinedOutput()
 	So(err, ShouldBeNil)
+	log.Printf("Result of command %v with args %v:\n%v", cmd, args, string(out))
 	return strings.TrimSpace(string(out))
 }
 

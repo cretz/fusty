@@ -133,7 +133,8 @@ func (c *Controller) apiWorkerComplete(w http.ResponseWriter, req *http.Request)
 			job.JobName, job.DeviceName, job.JobTime, job.Failure)
 	} else {
 		if Verbose {
-			log.Printf("Storing new job from worker: %v", job)
+			log.Printf("Storing new job %v on %v at expected time of %v with contents:\n%v",
+				job.JobName, job.DeviceName, job.JobTime, string(job.Contents))
 		}
 		c.DataStore.Store(job)
 	}

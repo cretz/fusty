@@ -35,4 +35,4 @@ Besides unit and integration tests, all source must run and pass the following:
 
 ## Integration Testing
 
-Please read the [integration documentation](../integration/README.md).
+Please read the [integration documentation](/integration/README.md).

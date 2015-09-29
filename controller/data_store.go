@@ -135,7 +135,7 @@ func (g *gitDataStore) ValidateAndApplyDefaults() error {
 		}
 	}
 	// We do a simple ping check here to see if the repository even exists
-	_, err := doGitCmd("", g.username(), g.password(), "ls-remote", g.conf.Url)
+	_, err := doGitCmd("", g.username(), g.password(), nil, "ls-remote", g.conf.Url)
 	if err != nil {
 		return fmt.Errorf("Git repository validation using ls-remote failed to validate URL %v: %v", g.conf.Url, err)
 	}
@@ -160,7 +160,8 @@ func (g *gitDataStore) Store(job *DataStoreJob) {
 	// TODO: queue up readme overview...
 	// Queue up the write
 	if Verbose {
-		log.Printf("Preparing to store job: %v", job)
+		log.Printf("Preparing to store job %v on %v at expected time of %v with contents:\n%v",
+			job.JobName, job.DeviceName, job.JobTime, string(job.Contents))
 	}
 	g.writesLock.Lock()
 	key := job.key()
@@ -191,7 +192,7 @@ func (g *gitDataStore) nextJobs() []*DataStoreJob {
 	if len(g.pendingWrites) == 0 {
 		return nil
 	}
-	jobs := make([]*DataStoreJob, len(g.pendingWrites), len(g.pendingWrites))
+	jobs := []*DataStoreJob{}
 	for key, jobList := range g.pendingWrites {
 		jobs = append(jobs, jobList...)
 		// Mark as running
@@ -265,6 +266,9 @@ func (g *gitWorker) pushJobs(jobs []*DataStoreJob) {
 		return
 	}
 	for _, job := range jobs {
+		if Verbose {
+			log.Printf("Committing and pushing job %v for device %v", job.JobName, job.DeviceName)
+		}
 		if err := g.commitJob(job); err != nil {
 			log.Printf("Failed to commit job %v for device %v: %v", job.JobName, job.DeviceName, err)
 		}
@@ -350,8 +354,8 @@ func (g *gitWorker) commitJob(job *DataStoreJob) error {
 		failure = fmt.Sprintf("\n* Failure: %v", job.Failure)
 	}
 	message := fmt.Sprintf(
-		"* Job: %v:\n"+
-			"* Device: %v:\n"+
+		"* Job: %v\n"+
+			"* Device: %v\n"+
 			"* Expected Run Date: %v\n"+
 			"* Start Date: %v\n"+
 			"* End On: %v\n"+
@@ -360,10 +364,24 @@ func (g *gitWorker) commitJob(job *DataStoreJob) error {
 		job.StartTime.Format(time.ANSIC), job.EndTime.Format(time.ANSIC), job.EndTime.Sub(job.StartTime),
 	)
 	// We --allow-empty so we can commit a message even without contents/change
+	args := []string{"commit", "--allow-empty", "-m", message}
+	// We have to make the author as friendly name or username
+	env := map[string]string{}
+	if g.dataStore.conf.DataStoreGitUser != nil &&
+		(g.dataStore.conf.DataStoreGitUser.FriendlyName != "" || g.dataStore.conf.DataStoreGitUser.Email != "") {
+		args = append(args, "--author",
+			g.dataStore.conf.DataStoreGitUser.FriendlyName+" <"+g.dataStore.conf.DataStoreGitUser.Email+">")
+		if g.dataStore.conf.DataStoreGitUser.FriendlyName != "" {
+			env["GIT_COMMITTER_NAME"] = g.dataStore.conf.DataStoreGitUser.FriendlyName
+		}
+		if g.dataStore.conf.DataStoreGitUser.Email != "" {
+			env["GIT_COMMITTER_EMAIL"] = g.dataStore.conf.DataStoreGitUser.Email
+		}
+	}
 	if Verbose {
 		log.Printf("Committing from %v with message:\n%v", g.dir, message)
 	}
-	if out, err := g.doGitCmd("commit", "--allow-empty", "-m", message); err != nil {
+	if out, err := g.doGitCmdWithEnv(env, args...); err != nil {
 		return fmt.Errorf("Unable to do git commit on %v: %v. Output:\n%v", g.dir, err, out)
 	}
 	return nil
@@ -380,7 +398,11 @@ func (g *gitWorker) push() error {
 }
 
 func (g *gitWorker) doGitCmd(args ...string) (string, error) {
-	return doGitCmd(g.dir, g.dataStore.username(), g.dataStore.password(), args...)
+	return doGitCmd(g.dir, g.dataStore.username(), g.dataStore.password(), nil, args...)
+}
+
+func (g *gitWorker) doGitCmdWithEnv(env map[string]string, args ...string) (string, error) {
+	return doGitCmd(g.dir, g.dataStore.username(), g.dataStore.password(), env, args...)
 }
 
 func (g *gitWorker) writeGitFile(path string, contents []byte) error {
@@ -400,10 +422,19 @@ func (g *gitWorker) writeGitFile(path string, contents []byte) error {
 	return err
 }
 
-func doGitCmd(dir string, username string, password string, args ...string) (string, error) {
+func doGitCmd(dir string, username string, password string, env map[string]string, args ...string) (string, error) {
 	cmd := exec.Command("git", args...)
 	if dir != "" {
 		cmd.Dir = dir
+	}
+	if len(env) > 0 {
+		cmd.Env = os.Environ()
+		for k, v := range env {
+			cmd.Env = append(cmd.Env, k+"="+v)
+		}
+	}
+	if Verbose {
+		log.Printf("Running git command with args %v", args)
 	}
 	var out bytes.Buffer
 	cmd.Stdout = &out

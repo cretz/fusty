@@ -83,8 +83,10 @@ type JobStoreLocal struct {
 
 type Job struct {
 	Generic      string `json:"generic,omitempty"`
+	Type         string `json:"type,omitempty"`
 	*JobSchedule `json:"schedule,omitempty"`
 	*JobCommand  `json:"command,omitempty"`
+	JobFile      map[string]*JobFile `json:"file,omitempty"`
 }
 
 type JobSchedule struct {
@@ -98,9 +100,13 @@ type JobCommand struct {
 	Inline []string `json:"inline,omitempty"`
 }
 
+type JobFile struct {
+	Compression string `json:"compression,omitempty"`
+}
+
 type DeviceStore struct {
 	Type              string `json:"type,omitempty"`
-	*DeviceStoreLocal `json:"loca,omitemptyl"`
+	*DeviceStoreLocal `json:"local,omitemptyl"`
 }
 
 type DeviceStoreLocal struct {

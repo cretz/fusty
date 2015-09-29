@@ -1,0 +1,3 @@
+[submodule "integration/emulated/packer-veos"]
+	path = integration/emulated/packer-veos
+	url = https://github.com/arista-eosplus/packer-veos

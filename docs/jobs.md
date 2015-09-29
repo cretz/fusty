@@ -16,8 +16,13 @@ settings and the defaults are below.
   * `iso_8601` - [ISO-8601](https://en.wikipedia.org/wiki/ISO_8601#Time_intervals) interval string. This is expected to
     be a repeating interval.
   * `fixed` - Unix time to run this exactly
-* `command` - No default, required
+* `type` - Optional job type. Default is `command` but can also be `file`.
+* `command` - No default, required if type is `command`
   * `inline` - An array of commands to run to obtain the text to backup
+* `file` - No default, required if type is `file`. Each key is the fully qualified path. Multiple files will be
+  concatenated in alphabetical order.
+  * `FILEPATH` - The file path to fetch.
+    * `compression` - If present, this is the compression used by the file. Only `gzip` supported currently.
 
 ## Job Distribution
 

@@ -2,3 +2,6 @@
 /fusty
 /integration/emulated/.vagrant
 /integration/emulated/packer_virtualbox-ovf_virtualbox.box
+/integration/emulated/vEOS.vmdk
+/integration/emulated/Aboot-vEOS.iso
+/integration/emulated/arista-vm.box

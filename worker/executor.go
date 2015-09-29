@@ -2,9 +2,13 @@ package worker
 
 import (
 	"bytes"
+	"compress/gzip"
 	"fmt"
 	"gitlab.com/cretz/fusty/model"
+	"io/ioutil"
 	"log"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -17,6 +21,10 @@ type result struct {
 	file           []byte // This can be nil/empty
 	failure        error
 }
+
+var (
+	fileContentsHr string = strings.Repeat("-", 12)
+)
 
 func runExecution(execution *model.Execution) *result {
 	res := &result{
@@ -47,27 +55,53 @@ func runExecution(execution *model.Execution) *result {
 
 func runJob(sess session, job *model.Job) ([]byte, error) {
 	// TODO: support ignoring errors?
+	// We don't support command yet...
+	if job.CommandSet != nil {
+		panic("Command sets not supported yet")
+	}
+	// Just sftp files for now
+	// Get all the paths and sort in alphabetical order
+	paths := []string{}
+	for path, _ := range job.FileSet {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	// Run for each, decompressing as needed
 	var buf bytes.Buffer
-	// Run each command one at a time, failing on first error, otherwise concatenating
-	// command results into one large buffer
-	var err error
-	for _, command := range job.CommandSet.Commands {
-		bytes, commandErr := sess.run(command)
-		if len(bytes) > 0 {
-			if Verbose {
-				log.Printf("Command '%v' result: %v", command, string(bytes))
-			}
-			if _, writeErr := buf.Write(bytes); writeErr != nil {
-				// We know this will get overridden by command err if present which is a good thing
-				err = fmt.Errorf("Unable to write to buffer: %v", writeErr)
-			}
+	for i, path := range paths {
+		if Verbose {
+			log.Printf("Fetching file: %v", path)
 		}
-		if commandErr != nil {
-			err = fmt.Errorf("Command failed: %v", commandErr)
-		}
+		// Any error is an error for all
+		fileBytes, err := sess.fetchFile(path)
 		if err != nil {
-			break
+			return nil, err
+		}
+		if job.FileSet[path].Compression == "gzip" {
+			gzipReader, err := gzip.NewReader(bytes.NewReader(fileBytes))
+			if err != nil {
+				return nil, fmt.Errorf("Unable to begin decompressing file %v: %v", path, err)
+			}
+			defer gzipReader.Close()
+			fileBytes, err = ioutil.ReadAll(gzipReader)
+			if err != nil {
+				return nil, fmt.Errorf("Unable to decompress file %v: %v", path, err)
+			}
+		}
+		// If there are multiple files, we separate each section with the path
+		if len(paths) > 1 {
+			fileBytes = append([]byte(fileContentsHr+"\nFile: "+path+"\n"+fileContentsHr+"\n"), fileBytes...)
+		}
+		// Any one after the first must have a newline prepended
+		if i > 0 {
+			fileBytes = append([]byte("\n"), fileBytes...)
+		}
+		if _, err := buf.Write(fileBytes); err != nil {
+			return nil, fmt.Errorf("Error writing contents to buffer: %v", err)
 		}
 	}
-	return buf.Bytes(), err
+	if Verbose {
+		log.Printf("Overall fetched:\n%v", string(buf.Bytes()))
+	}
+	return buf.Bytes(), nil
 }
