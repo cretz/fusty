@@ -42,7 +42,7 @@ Now to start the VM:
                                        
     vagrant up arista-vm
 
-Note, there is currently a bug preventing this from working properly.
+Note, there is currently a bug preventing this from working properly. Nothing is done with this VM yet.
 
 ### Juniper VM
 
@@ -52,6 +52,32 @@ directory:
     vagrant up juniper-vsrx
 
 This VM is actually used in the integration tests.
+
+### Cisco UCS VM
+
+Make sure [VirtualBox](https://www.virtualbox.org/) is installed and `VBoxManage` is on the `PATH`. Then, get the latest
+Cisco UCS Emulator OVA [here](https://communities.cisco.com/ucspe). Yes, this requires at least guest-level Cisco login,
+sorry. Put the OVA file as `cisco-ucs.ova` in the `emulated` directory. All commands below are expected to run in that
+directory.
+
+Upon first start, you have to create a DHCP server to use:
+
+    VBoxManage dhcpserver add --ip 10.10.10.1 --netmask 255.0.0.0 --lowerip 10.10.10.2 --upperip 10.10.10.10 --netname cisco-ucs-net --enable
+
+Now, to start a VM:
+
+    VBoxManage import cisco-ucs.ova --vsys 0 --vmname cisco-ucs-1 --cpus 2 --memory 2048
+    VBoxManage modifyvm cisco-ucs-1 --natpf1 ",tcp,127.0.0.1,2223,,22"
+    VBoxManage modifyvm cisco-ucs-1 --nic2 intnet --intnet2 cisco-ucs-net
+    VBoxManage modifyvm cisco-ucs-1 --nic3 intnet --intnet3 cisco-ucs-net
+    VBoxManage startvm cisco-ucs-1 --type gui
+
+Now you can login via SSH on port 2223 as user/pass `ucspe`/`ucspe`. To destroy the VM:
+
+    VBoxManage controlvm cisco-ucs-1 poweroff
+    VBoxManage unregistervm cisco-ucs-1 -delete
+
+Note, this has no real purpose right now for Fusty so it is unused.
 
 ## Running
 

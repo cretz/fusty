@@ -62,9 +62,6 @@ func buildAristaVm(args ...string) error {
 	firstBuilder := conf["builders"].([]interface{})[0].(map[string]interface{})
 	firstBuilder["source_path"] = filepath.Join(basePath, "vEOS-ovf-temp.ovf")
 
-	// Remove export opts
-	delete(firstBuilder, "export_opts")
-
 	// Inject the post processor
 	err = injectPostProcessor(conf, map[string]interface{}{
 		"type":   "vagrant",
