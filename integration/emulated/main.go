@@ -42,7 +42,7 @@ func buildAristaVm(args ...string) error {
 	if err := ioutil.WriteFile("vEOS-ovf-temp.ovf", ovfContents, os.ModePerm); err != nil {
 		return fmt.Errorf("Unable to write ovf file: %v", err)
 	}
-	defer os.Remove("vEOS-ovf-temp.ovf")
+	// defer os.Remove("vEOS-ovf-temp.ovf")
 
 	// Load existing packer config based on OS
 	fileName := "packer-veos/virtualbox/vEOS.json"
@@ -63,21 +63,21 @@ func buildAristaVm(args ...string) error {
 	firstBuilder["source_path"] = filepath.Join(basePath, "vEOS-ovf-temp.ovf")
 
 	// Inject the post processor
-	err = injectPostProcessor(conf, map[string]interface{}{
-		"type":   "vagrant",
-		"output": filepath.Join(basePath, "arista-vm.box"),
-	})
-	if err != nil {
-		return err
-	}
-	confFile, err := ioutil.TempFile(os.TempDir(), "vEOS-conf-temp")
+	// err = injectPostProcessor(conf, map[string]interface{}{
+	// 	"type":   "vagrant",
+	// 	"output": filepath.Join(basePath, "arista-vm.box"),
+	// })
+	// if err != nil {
+	// 	return err
+	// }
+	confFile, err := ioutil.TempFile(".", "vEOS-conf-temp")
 	if err != nil {
 		return fmt.Errorf("Unable to create new temp file: %v", err)
 	}
-	defer func() {
-		confFile.Close()
-		os.Remove(confFile.Name())
-	}()
+	// defer func() {
+	// 	confFile.Close()
+	// 	os.Remove(confFile.Name())
+	// }()
 	fileBytes, err = json.MarshalIndent(conf, "", "  ")
 	if err != nil {
 		return fmt.Errorf("Unable to marshal JSON: %v", err)
@@ -99,6 +99,7 @@ func buildAristaVm(args ...string) error {
 	}
 
 	// Now run packer
+	log.Fatal("DONE!")
 	cmd := exec.Command("packer", "build", "-only", "vEOS1", confFile.Name())
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout

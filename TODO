@@ -30,6 +30,7 @@ For MVP:
     an option in the future
 * Hold metrics
   * Probably use https://github.com/rcrowley/go-metrics at first
+* Be more specific about types accepted in config (i.e. unsigned int vs int)
 
 Future:
 * HA controller support

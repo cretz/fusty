@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 var baseDirectory string
@@ -261,4 +262,51 @@ type stdoutWriter struct {
 func (s *stdoutWriter) Write(p []byte) (n int, err error) {
 	log.Print(s.prefix + strings.TrimSpace(string(p)))
 	return len(p), nil
+}
+
+func startControllerInBackground(c C, conf *config.Config) *fustyCmd {
+	log.Print("Starting controller")
+	var controllerCmd *fustyCmd
+	Reset(func() {
+		if controllerCmd != nil && !controllerCmd.Exited() {
+			controllerCmd.Stop()
+		}
+	})
+	confFile, err := writeConfigFile(conf)
+	c.So(err, ShouldBeNil)
+	bytes, err := conf.ToBytesPretty()
+	c.So(err, ShouldBeNil)
+	log.Printf("Running controller with config and waiting 3 seconds to start: %v", string(bytes))
+	controllerCmd = runFusty(c, "controller", "-config", confFile.Name(), "-verbose")
+	go controllerCmd.RunAndStreamToOutput("Controller out: ")
+	// Wait just a sec and confirm it's still running
+	time.Sleep(time.Duration(3) * time.Second)
+	c.So(controllerCmd.Exited(), ShouldBeFalse)
+	return controllerCmd
+}
+
+func startWorkerInBackground(c C) *fustyCmd {
+	log.Print("Starting worker")
+	var workerCmd *fustyCmd
+	Reset(func() {
+		if workerCmd != nil && !workerCmd.Exited() {
+			workerCmd.Stop()
+		}
+	})
+	args := []string{
+		"worker",
+		"-controller",
+		"http://127.0.0.1:9400",
+		// We'll sleep for 20 minutes, because basically the worker will fetch work right from
+		// the beginning and we only want to check the first run
+		"-sleep",
+		"1200",
+		"-verbose",
+		// We give a max of 1 because we only care about 1 execution
+		"-maxjobs",
+		"1",
+	}
+	workerCmd = runFusty(c, args...)
+	go workerCmd.RunAndStreamToOutput("Worker out: ")
+	return workerCmd
 }

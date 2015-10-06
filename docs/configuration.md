@@ -132,12 +132,10 @@ local job stores. Below is an example of a local job store configuration in JSON
         // The type of job to execute. Default is "command".
         // "type": "command",
 
-        // The command(s) to execute and get results for
-        "command": {
-
-          // Inline is one option to provide a set of commands
-          "inline": ["show run"]
-        }
+        // The commands to execute and get results for
+        "commands": [
+          { "command": "show run" }
+        ]
       }
     }
   }

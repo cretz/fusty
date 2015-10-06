@@ -3,22 +3,25 @@ package integration
 import (
 	"bytes"
 	"fmt"
+	"gitlab.com/cretz/fusty/config"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/terminal"
 	"io/ioutil"
 	"log"
 	"net"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
 type mockDevice struct {
-	username         string
-	password         string
-	listenOn         string
-	serverConfig     *ssh.ServerConfig
-	listener         net.Listener
-	responses        map[string]string
-	responseStatuses map[string]int
+	username     string
+	password     string
+	listenOnHost string
+	listenOnPort int
+	serverConfig *ssh.ServerConfig
+	listener     net.Listener
+	responses    map[string]string
 }
 
 // Some help from https://gist.github.com/jpillora/b480fde82bff51a06238 and
@@ -48,10 +51,13 @@ func (m *mockDevice) listen() error {
 		}
 		m.serverConfig.AddHostKey(private)
 	}
-	if m.listenOn == "" {
-		m.listenOn = "127.0.0.1:0"
+	if m.listenOnHost == "" {
+		m.listenOnHost = "127.0.0.1"
 	}
-	list, err := net.Listen("tcp", m.listenOn)
+	if m.listenOnPort == 0 {
+		m.listenOnPort = 2223
+	}
+	list, err := net.Listen("tcp", m.listenOnHost+strconv.Itoa(m.listenOnPort))
 	if err != nil {
 		return fmt.Errorf("Unable to start mock device: %v", err)
 	}
@@ -98,26 +104,49 @@ func (m *mockDevice) handleChannel(newCh ssh.NewChannel) {
 	}
 	go func(in <-chan *ssh.Request) {
 		for req := range in {
-			log.Printf("GOT REQ TYPE: %v, WANT REPLY %v, BODY: %v", req.Type, req.WantReply, string(req.Payload))
 			ok := false
 			switch req.Type {
-			// TODO: support shell
-			case "exec":
-				defer ch.Close()
+			case "shell":
 				ok = true
-				payload := bytes.Trim(req.Payload, "\x00\x08")
-				cmd := strings.TrimSpace(string(payload))
-				log.Printf("Handling SSH command: '%v'", cmd)
-				// TODO: actually handle it properly here, I don't know how but may not need to since
-				// shell is the more important one anyways
+				if len(req.Payload) > 0 {
+					// We don't accept any commands, only the default shell
+					ok = false
+				}
 			}
 			req.Reply(ok, nil)
 		}
 	}(reqs)
+
+	term := terminal.NewTerminal(ch, "> ")
+
+	go func() {
+		defer ch.Close()
+		for {
+			line, err := term.ReadLine()
+			if err != nil {
+				break
+			}
+			fmt.Println("YOU TYPED: " + line)
+		}
+	}()
 }
 
 func (m *mockDevice) stop() {
 	if m.listener != nil {
 		m.listener.Close()
+	}
+}
+
+func (m *mockDevice) genericDevice() *config.Device {
+	return &config.Device{
+		Host: m.listenOnHost,
+		DeviceProtocol: &config.DeviceProtocol{
+			Type:              "ssh",
+			DeviceProtocolSsh: &config.DeviceProtocolSsh{Port: m.listenOnPort},
+		},
+		DeviceCredentials: &config.DeviceCredentials{
+			User: m.username,
+			Pass: m.password,
+		},
 	}
 }

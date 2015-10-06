@@ -9,7 +9,7 @@ import (
 type Job struct {
 	Name        string `json:"name"`
 	*CommandSet `json:"command_set"`
-	FileSet     map[string]*JobFile `json:"file_set"`
+	*FileSet    `json:"file_set"`
 	Schedule    `json:"-"`
 }
 
@@ -20,29 +20,18 @@ func NewDefaultJob(name string) *Job {
 func (j *Job) ApplyConfig(conf *config.Job) error {
 	switch conf.Type {
 	case "", "command":
-		if conf.JobCommand != nil {
-			if cmdSet, err := NewCommandSetFromConfig(conf.JobCommand); err != nil {
-				return fmt.Errorf("Invalid command set: %v", err)
-			} else {
-				j.CommandSet = cmdSet
-			}
+		if len(conf.Commands) > 0 {
+			j.CommandSet = NewDefaultCommandSet()
+			j.CommandSet.ApplyConfig(conf)
 		}
 	case "file":
 		if len(conf.JobFile) == 0 {
 			return errors.New("At least one file required")
 		}
-		j.FileSet = make(map[string]*JobFile)
-		for fileName, fileConf := range conf.JobFile {
-			if fileName == "" {
-				return errors.New("Empty filename")
-			}
-			if fileConf.Compression != "" && fileConf.Compression != "gzip" {
-				return fmt.Errorf("Invalid compression '%v' for file", fileConf.Compression)
-			}
-			j.FileSet[fileName] = &JobFile{Compression: fileConf.Compression}
-		}
+		j.FileSet = NewDefaultFileSet()
+		j.FileSet.ApplyConfig(conf)
 	default:
-		return fmt.Errorf("Unrecognized jov type %v", conf.Type)
+		return fmt.Errorf("Unrecognized job type %v", conf.Type)
 	}
 	if conf.JobSchedule != nil {
 		if sched, err := NewScheduleFromConfig(conf.JobSchedule); err != nil {
@@ -66,23 +55,21 @@ func (j *Job) DeepCopy() *Job {
 		job.CommandSet = j.CommandSet.DeepCopy()
 	}
 	if j.FileSet != nil {
-		job.FileSet = make(map[string]*JobFile)
-		for k, v := range j.FileSet {
-			job.FileSet[k] = v.DeepCopy()
-		}
+		job.FileSet = j.FileSet.DeepCopy()
 	}
-	return j
+	return job
 }
 
 func (j *Job) Validate() []error {
-	// TODO: There is nothing else to validate right now
+	errs := []error{}
+	if j.Schedule == nil {
+		errs = append(errs, errors.New("Job schedule required"))
+	}
+	if j.CommandSet != nil {
+		errs = append(errs, j.CommandSet.Validate()...)
+	}
+	if j.FileSet != nil {
+		errs = append(errs, j.FileSet.Validate()...)
+	}
 	return nil
-}
-
-type JobFile struct {
-	Compression string `json:"compression"`
-}
-
-func (j *JobFile) DeepCopy() *JobFile {
-	return &JobFile{Compression: j.Compression}
 }

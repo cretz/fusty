@@ -17,12 +17,33 @@ settings and the defaults are below.
     be a repeating interval.
   * `fixed` - Unix time to run this exactly
 * `type` - Optional job type. Default is `command` but can also be `file`.
-* `command` - No default, required if type is `command`
-  * `inline` - An array of commands to run to obtain the text to backup
+* `commands` - Array of command types. No default, required if type is `command`. Each command item can contain:
+  * `command` - String in each command item for the command to type.
+  * `expect` - Optional array of string regex patterns. If any of these patterns is matched, the command is considered a
+    success. If none of these is matched the command is considered a failure, even if nothing in `expect_not` matches.
+    If `expect_not` is present and anything matches there, the failure emitted trumps any successful match here. If both
+    this and `expect_not` are not present the command is always considered a success.
+  * `expect_not` - Optional array of string regex patterns. If any of these patterns is matched, the command is
+    considered a failure. This is true regardless of whether anything in `expect` matches.
+  * `timeout` - The optional amount of time in seconds to wait until something in `expect` or `expect_not` matches. If
+    only `expect_not` is present, when the timeout is reached without a match the command is considered a success. If
+    `expect` is present (regardless of whether `expect_not` is present), when timeout is reached without a match the
+    command is considered a failure. If both `expect` and `expect_not` are not present, the system will wait the given
+    amount of time always and always consider the result a success. If this is not present, it is defaulted at 120
+    seconds. This value must be at least 1 if `expect` or `expect_not` are present. If neither `expect` nor `expect_not`
+    are present, this value can be set to 0 to continue immediately.
+  * `implicit_enter` - Optional boolean on whether there is an implicit "enter" that is typed after every command. By
+    default this is true.
+* `command_generic` - Object that has settings as though they are on each command item detailed in the previous bullet
+  point.
 * `file` - No default, required if type is `file`. Each key is the fully qualified path. Multiple files will be
   concatenated in alphabetical order.
   * `FILEPATH` - The file path to fetch.
     * `compression` - If present, this is the compression used by the file. Only `gzip` supported currently.
+
+### Prompt Conditions
+
+
 
 ## Job Distribution
 

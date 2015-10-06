@@ -1,12 +1,16 @@
 package worker
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"gitlab.com/cretz/fusty/model"
+	"io"
 	"io/ioutil"
 	"log"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -54,16 +58,103 @@ func runExecution(execution *model.Execution) *result {
 }
 
 func runJob(sess session, job *model.Job) ([]byte, error) {
-	// TODO: support ignoring errors?
-	// We don't support command yet...
-	if job.CommandSet != nil {
-		panic("Command sets not supported yet")
+	if job.FileSet != nil {
+		return fetchFile(sess, job)
+	} else if job.CommandSet != nil {
+		return runCommands(sess, job)
+	} else {
+		return nil, errors.New("Unable to find file set or command set to run")
 	}
+}
+
+func runCommands(sess session, job *model.Job) ([]byte, error) {
+	shell, err := sess.shell()
+	if err != nil {
+		return nil, fmt.Errorf("Unable to open shell: %v", err)
+	}
+	defer shell.close()
+	buff := []byte{}
+	shellReader := bufio.NewReader(shell)
+	for _, cmd := range job.CommandSet.Commands {
+		if _, err := shell.Write([]byte(cmd.Command)); err != nil {
+			return buff, fmt.Errorf("Error writing command '%v': %v", cmd.Command, err)
+		}
+		if cmd.ImplicitEnter {
+			if _, err := shell.Write([]byte{13}); err != nil {
+				return buff, fmt.Errorf("Error entering after command '%v': %v", cmd.Command, err)
+			}
+		}
+		// Due to how we don't store job state from job to job, we recompile the regex
+		// every command here knowing it is not too expensive in most cases. Here if the
+		// timeout is not zero we check the output once a second.
+		if cmd.Timeout == 0 {
+			continue
+		}
+		expectRegex := []*regexp.Regexp{}
+		expectNotRegex := []*regexp.Regexp{}
+		for _, exp := range cmd.Expect {
+			if expr, err := regexp.Compile(exp); err != nil {
+				return buff, fmt.Errorf("Unable to compile regex '%v': %v", exp, err)
+			} else {
+				expectRegex = append(expectRegex, expr)
+			}
+		}
+		for _, exp := range cmd.ExpectNot {
+			if expr, err := regexp.Compile(exp); err != nil {
+				return buff, fmt.Errorf("Unable to compile regex '%v': %v", exp, err)
+			} else {
+				expectNotRegex = append(expectNotRegex, expr)
+			}
+		}
+
+		matchSuccess := false
+		thisBytes := []byte{}
+		for i := 0; i < cmd.Timeout; i++ {
+			time.Sleep(time.Second)
+			// Fetch all output since our last go
+			for {
+				n, err := shellReader.Read(thisBytes[len(thisBytes):])
+				if n > 0 {
+					// Write what we read
+					buff = append(buff, thisBytes[len(thisBytes)-n:]...)
+				}
+				if err != nil && err != io.EOF {
+					return buff, fmt.Errorf("Failure reading output of command '%v': %v", cmd.Command, err)
+				}
+				if n == 0 {
+					break
+				}
+			}
+			// Check for failure expectations
+			for i, notExpr := range expectNotRegex {
+				if notExpr.Match(thisBytes) {
+					return buff, fmt.Errorf("Output of command '%v' matched failure pattern: %v",
+						cmd.Command, cmd.ExpectNot[i])
+				}
+			}
+			// Now for success
+			for _, expr := range expectRegex {
+				if expr.Match(thisBytes) {
+					matchSuccess = true
+					break
+				}
+			}
+		}
+		if len(expectRegex) > 0 && !matchSuccess {
+			return buff, fmt.Errorf("Output of command '%v' never matched expected pattern(s)", cmd.Command)
+		}
+	}
+	return buff, nil
+}
+
+func fetchFile(sess session, job *model.Job) ([]byte, error) {
 	// Just sftp files for now
 	// Get all the paths and sort in alphabetical order
 	paths := []string{}
-	for path, _ := range job.FileSet {
-		paths = append(paths, path)
+	pathsToFiles := map[string]*model.FileSetFile{}
+	for _, file := range job.FileSet.Files {
+		paths = append(paths, file.Name)
+		pathsToFiles[file.Name] = file
 	}
 	sort.Strings(paths)
 	// Run for each, decompressing as needed
@@ -77,7 +168,7 @@ func runJob(sess session, job *model.Job) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		if job.FileSet[path].Compression == "gzip" {
+		if pathsToFiles[path].Compression == "gzip" {
 			gzipReader, err := gzip.NewReader(bytes.NewReader(fileBytes))
 			if err != nil {
 				return nil, fmt.Errorf("Unable to begin decompressing file %v: %v", path, err)

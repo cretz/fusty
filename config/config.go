@@ -82,11 +82,12 @@ type JobStoreLocal struct {
 }
 
 type Job struct {
-	Generic      string `json:"generic,omitempty"`
-	Type         string `json:"type,omitempty"`
-	*JobSchedule `json:"schedule,omitempty"`
-	*JobCommand  `json:"command,omitempty"`
-	JobFile      map[string]*JobFile `json:"file,omitempty"`
+	Generic        string `json:"generic,omitempty"`
+	Type           string `json:"type,omitempty"`
+	*JobSchedule   `json:"schedule,omitempty"`
+	Commands       []*JobCommand       `json:"commands,omitempty"`
+	CommandGeneric *JobCommand         `json:"command_generic,omitempty"`
+	JobFile        map[string]*JobFile `json:"file,omitempty"`
 }
 
 type JobSchedule struct {
@@ -97,7 +98,11 @@ type JobSchedule struct {
 }
 
 type JobCommand struct {
-	Inline []string `json:"inline,omitempty"`
+	Command       string   `json:"command,omitempty"`
+	Expect        []string `json:"expect,omitempty"`
+	ExpectNot     []string `json:"expect_not,omitempty"`
+	Timeout       *int     `json:"timeout,omitempty"`
+	ImplicitEnter *bool    `json:"implicit_enter,omitempty"`
 }
 
 type JobFile struct {

@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/sftp"
 	"gitlab.com/cretz/fusty/model"
 	"golang.org/x/crypto/ssh"
+	"io"
 	"io/ioutil"
 	"log"
 	"strconv"
@@ -21,6 +22,14 @@ type session interface {
 	run(cmd string) ([]byte, error)
 
 	fetchFile(path string) ([]byte, error)
+
+	shell() (sessionShell, error)
+}
+
+type sessionShell interface {
+	io.Reader
+	io.Writer
+	close() error
 }
 
 func newSession(device *model.Device) (session, error) {
@@ -87,4 +96,46 @@ func (s *sshSession) fetchFile(path string) ([]byte, error) {
 		return nil, fmt.Errorf("Unable to read %v via SFTP on %v: %v", path, s.device.Host, err)
 	}
 	return bytes, nil
+}
+
+func (s *sshSession) shell() (sessionShell, error) {
+	sess, err := s.client.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("Unable to initiate session on %v: %v", s.device.Host, err)
+	}
+	sshOut, err := sess.StdoutPipe()
+	if err != nil {
+		sess.Close()
+		return nil, fmt.Errorf("Unable to open stdout pipe to external server: %v", err)
+	}
+	sshErr, err := sess.StderrPipe()
+	if err != nil {
+		sess.Close()
+		return nil, fmt.Errorf("Unable to open stderr pipe to external server: %v", err)
+	}
+	sshIn, err := sess.StdinPipe()
+	if err != nil {
+		sess.Close()
+		return nil, fmt.Errorf("Unable to open stdin pipe to external server: %v", err)
+	}
+	// TODO: what about request pty goodies?
+	return &sshSessionShell{
+		Reader:          io.MultiReader(sshOut, sshErr),
+		WriteCloser:     sshIn,
+		internalSession: sess,
+	}, nil
+}
+
+type sshSessionShell struct {
+	io.Reader
+	io.WriteCloser
+	internalSession *ssh.Session
+}
+
+func (s *sshSessionShell) close() error {
+	ret := s.WriteCloser.Close()
+	if err := s.internalSession.Close(); err != nil {
+		ret = err
+	}
+	return fmt.Errorf("Unable to close shell: %v", ret)
 }

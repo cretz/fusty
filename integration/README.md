@@ -38,18 +38,15 @@ This VM is created similar to the GNS3 one. Perform the following steps in the `
 4. Same as above for `Aboot-[release].iso` and rename it `Aboot-vEOS.iso`
 5. Run `go run main.go build-arista-vm`
 
-Now to start the VM:
-                                       
-    vagrant up arista-vm
-
-Note, there is currently a bug preventing this from working properly. Nothing is done with this VM yet.
+Note, there is currently a bug preventing this from working properly. Nothing is done with this VM yet. See
+[this issue](https://github.com/jerearista/vagrant-veos/issues/4) for more information.
 
 ### Juniper VM
 
 The Juniper VM is already an existing Vagrant box. Therefore, to start it, simply run the following in the `emulated`
 directory:
 
-    vagrant up juniper-vsrx
+    vagrant up juniper-vsrx --no-destroy-on-error
 
 This VM is actually used in the integration tests.
 
@@ -81,7 +78,12 @@ Note, this has no real purpose right now for Fusty so it is unused.
 
 ## Running
 
-Assuming the emulated environments are running, the integration tests can be executed. They use
+Note, the integration tests currently work by executing the binary from the outside. This means that the "`go build`"
+has to be executed on every change manually. In the future this will be automated.
+
+### Lightweight Integration Tests
+
+Some integration tests are lightweight and can be continuously executed via
 [GoConvey](https://github.com/smartystreets/goconvey). Simply run the following:
 
     go get github.com/smartystreets/goconvey
@@ -89,9 +91,13 @@ Assuming the emulated environments are running, the integration tests can be exe
 Then there is a binary at `$GOPATH/bin` called `goconvey`. Simply run it in the `fusty` directory and the results can
 be viewed at http://localhost:8080.
 
-Note, the integration tests currently work by executing the binary from the outside. This means that the "`go build`"
-has to be executed on every change manually. In the future this will be automated.
-
 Note, the integration tests currently work by executing the binary from the outside. This means that code coverage
 information inside the binary is unavailable. Programmatically invoking Fusty is a possible future feature to alleviate
 this.
+
+### Heavy Integration Tests
+
+Some tests are a bit heavier. This includes tests that require emulated environments to be online. These must be
+executed from withing this `integration` folder. Once in that folder, simply run:
+
+    go test -tags heavy
