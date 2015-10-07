@@ -1,14 +1,11 @@
-// +build heavy2
+// +build heavy
 
 package integration
 
 import (
 	. "github.com/smartystreets/goconvey/convey"
 	"gitlab.com/cretz/fusty/config"
-	"io/ioutil"
 	"log"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,12 +13,13 @@ import (
 
 func TestSimpleSsh(t *testing.T) {
 	Convey("Given we have a fresh git repository", t, func(c C) {
+		ctx := newContext()
 		// Initialize the git path
 		log.Print("Reinitializing git")
-		cleanAndReinitializeGitRepo(c)
+		ctx.initializeGitRepo(c)
 
 		// This config already has the data store set up properly
-		conf := newWorkingConfig()
+		conf := ctx.newWorkingConfig()
 
 		Convey("When an SSH emulated environment is running", func(c C) {
 			log.Print("Starting a device")
@@ -32,7 +30,7 @@ func TestSimpleSsh(t *testing.T) {
 			conf.JobStore.JobStoreLocal.JobGenerics = map[string]*config.Job{"simplebase": defaultDeviceGenericJob()}
 			conf.JobStore.JobStoreLocal.Jobs = map[string]*config.Job{
 				"simple": &config.Job{
-					Generic:     "sshbase",
+					Generic:     "simplebase",
 					JobSchedule: &config.JobSchedule{Cron: "*/3 * * * * * *"},
 				},
 			}
@@ -51,12 +49,12 @@ func TestSimpleSsh(t *testing.T) {
 
 			Convey("And the controller and worker are started for 5 seconds to perform the backup", func(c C) {
 				// Fire up the controller and worker
-				controller := startController(c, conf)
-				worker := startWorker(c)
+				controller := ctx.startControllerInBackground(c, conf)
+				worker := ctx.startWorkerInBackground(c)
 
 				// Wait for 5 seconds and shut em down...
-				log.Print("Waiting 5 seconds and then shutting down controller and worker")
-				time.Sleep(time.Duration(5) * time.Second)
+				log.Print("Waiting 7 seconds and then shutting down controller and worker")
+				time.Sleep(time.Duration(7) * time.Second)
 				So(worker.Stop(), ShouldBeNil)
 				So(controller.Stop(), ShouldBeNil)
 				time.Sleep(time.Duration(1) * time.Second)
@@ -64,7 +62,7 @@ func TestSimpleSsh(t *testing.T) {
 				So(worker.Exited(), ShouldBeTrue)
 
 				Convey("Then the git commit should be accurate", func(c C) {
-					assertValidGitCommit()
+					ctx.assertValidGitCommit(strings.Repeat("command 1 result\r\n", 5))
 				})
 			})
 		})
@@ -76,8 +74,7 @@ func startDefaultDevice() *mockDevice {
 		username: "johndoe",
 		password: "secretpass",
 		responses: map[string]string{
-			"command1": strings.Repeat("This is a command1 response\n", 5),
-			"command2": strings.Repeat("This is a command2 response\n", 5),
+			"command1": strings.Repeat("command 1 result\r\n", 5),
 		},
 	}
 	So(device.listen(), ShouldBeNil)
@@ -86,10 +83,15 @@ func startDefaultDevice() *mockDevice {
 }
 
 func defaultDeviceGenericJob() *config.Job {
+	timeout := 20
 	return &config.Job{
+		CommandGeneric: &config.JobCommand{
+			Expect: []string{"prompt>"},
+			ExpectNot: []string{"ERROR"},
+			Timeout: &timeout,
+		},
 		Commands: []*config.JobCommand{
 			&config.JobCommand{Command: "command1"},
-			&config.JobCommand{Command: "command2"},
 		},
 	}
 }

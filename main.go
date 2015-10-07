@@ -9,9 +9,12 @@ import (
 	"log"
 	"os"
 	"strings"
+	"runtime"
 )
 
 func main() {
+	// TODO: remove this
+	runtime.GOMAXPROCS(4)
 	if len(os.Args) <= 1 {
 		log.Fatal("Command required")
 	}

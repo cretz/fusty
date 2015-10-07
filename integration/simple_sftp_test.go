@@ -5,23 +5,20 @@ package integration
 import (
 	. "github.com/smartystreets/goconvey/convey"
 	"gitlab.com/cretz/fusty/config"
-	"io/ioutil"
 	"log"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 )
 
 func TestSimpleSftp(t *testing.T) {
 	Convey("Given we have a fresh git repository", t, func(c C) {
+		ctx := newContext()
 		// Initialize the git path
 		log.Print("Reinitializing git")
-		cleanAndReinitializeGitRepo(c)
+		ctx.initializeGitRepo(c)
 
 		// This config already has the data store set up properly
-		conf := newWorkingConfig()
+		conf := ctx.newWorkingConfig()
 
 		Convey("When a Juniper emulated environment is running", func(c C) {
 			juniper := newDefaultEmulatedJuniperDevice()
@@ -50,8 +47,8 @@ func TestSimpleSftp(t *testing.T) {
 
 			Convey("And the controller and worker are started for 5 seconds to perform the backup", func(c C) {
 				// Fire up the controller and worker
-				controller := startControllerInBackground(c, conf)
-				worker := startWorkerInBackground(c)
+				controller := ctx.startControllerInBackground(c, conf)
+				worker := ctx.startWorkerInBackground(c)
 
 				// Wait for 5 seconds and shut em down...
 				log.Print("Waiting 5 seconds and then shutting down controller and worker")
@@ -63,39 +60,9 @@ func TestSimpleSftp(t *testing.T) {
 				So(worker.Exited(), ShouldBeTrue)
 
 				Convey("Then the git commit should be accurate", func(c C) {
-					assertValidSftpGitCommit()
+					ctx.assertValidGitCommit("ge-0/0/0")
 				})
 			})
 		})
 	})
-}
-
-func assertValidSftpGitCommit() {
-	gitAssertDir, err := ioutil.TempDir(tempDirectory, "git-assert-temp")
-	So(err, ShouldBeNil)
-	So(os.MkdirAll(gitAssertDir, os.ModePerm), ShouldBeNil)
-	runInDir(gitAssertDir, "git", "clone", gitRepoDirectory, gitAssertDir)
-
-	authorName := runInDir(gitAssertDir, "git", "log", "-1", "--pretty=%an")
-	So(authorName, ShouldEqual, "John Doe")
-	authorEmail := runInDir(gitAssertDir, "git", "log", "-1", "--pretty=%ae")
-	So(authorEmail, ShouldEqual, "jdoe@example.com")
-	commitComment := runInDir(gitAssertDir, "git", "log", "-1", "--pretty=%B")
-	So(commitComment, ShouldContainSubstring, "Job: simple\n")
-	So(commitComment, ShouldContainSubstring, "Device: local\n")
-	// TODO: Some extra validation of the values here?
-	So(commitComment, ShouldContainSubstring, "Expected Run Date:")
-	So(commitComment, ShouldContainSubstring, "Start Date:")
-	So(commitComment, ShouldContainSubstring, "End On:")
-	So(commitComment, ShouldContainSubstring, "Elapsed Time:")
-	filesText := runInDir(gitAssertDir, "git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD")
-	filesUpdated := strings.Split(filesText, "\n")
-	// TODO: Fix this when checking for other types of git structures
-	So(len(filesUpdated), ShouldEqual, 1)
-	So(filesUpdated, ShouldContain, "by_device/local/simple")
-
-	// Now read the the file and make sure it looks right
-	fileBytes, err := ioutil.ReadFile(filepath.Join(gitAssertDir, "by_device/local/simple"))
-	So(err, ShouldBeNil)
-	So(string(fileBytes), ShouldContainSubstring, "ge-0/0/0")
 }

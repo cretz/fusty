@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"bytes"
 	"fmt"
 	"gitlab.com/cretz/fusty/config"
 	"golang.org/x/crypto/ssh"
@@ -11,7 +10,7 @@ import (
 	"net"
 	"path/filepath"
 	"strconv"
-	"strings"
+	"io"
 )
 
 type mockDevice struct {
@@ -22,6 +21,7 @@ type mockDevice struct {
 	serverConfig *ssh.ServerConfig
 	listener     net.Listener
 	responses    map[string]string
+	prompt string
 }
 
 // Some help from https://gist.github.com/jpillora/b480fde82bff51a06238 and
@@ -34,8 +34,10 @@ func (m *mockDevice) listen() error {
 			m.serverConfig.PasswordCallback = func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 				log.Printf("SSH auth being attempted by %v", c.User())
 				if c.User() == m.username && string(pass) == m.password {
+					log.Print("Login succeeded")
 					return nil, nil
 				}
+				log.Print("Login failed")
 				return nil, fmt.Errorf("Password rejected for %q", c.User())
 			}
 		} else {
@@ -57,7 +59,10 @@ func (m *mockDevice) listen() error {
 	if m.listenOnPort == 0 {
 		m.listenOnPort = 2223
 	}
-	list, err := net.Listen("tcp", m.listenOnHost+strconv.Itoa(m.listenOnPort))
+	if m.prompt == "" {
+		m.prompt = "prompt> "
+	}
+	list, err := net.Listen("tcp", m.listenOnHost+":"+strconv.Itoa(m.listenOnPort))
 	if err != nil {
 		return fmt.Errorf("Unable to start mock device: %v", err)
 	}
@@ -76,24 +81,25 @@ func (m *mockDevice) acceptUntilError() error {
 			log.Printf("Failed to accept client: %v", err)
 			return nil
 		}
-		_, chans, reqs, err := ssh.NewServerConn(conn, m.serverConfig)
+		serverConn, chans, reqs, err := ssh.NewServerConn(conn, m.serverConfig)
 		if err != nil {
 			log.Printf("Failed to initiate client connection: %v", err)
 			continue
 		}
 		go ssh.DiscardRequests(reqs)
-		go m.handleChannels(chans)
+		go m.handleChannels(chans, serverConn)
 	}
 }
 
-func (m *mockDevice) handleChannels(chans <-chan ssh.NewChannel) {
+func (m *mockDevice) handleChannels(chans <-chan ssh.NewChannel, serverConn *ssh.ServerConn) {
 	for newChannel := range chans {
-		go m.handleChannel(newChannel)
+		go m.handleChannel(newChannel, serverConn)
 	}
 }
 
-func (m *mockDevice) handleChannel(newCh ssh.NewChannel) {
+func (m *mockDevice) handleChannel(newCh ssh.NewChannel, serverConn *ssh.ServerConn) {
 	if t := newCh.ChannelType(); t != "session" {
+		log.Printf("Unknown channel type: %v", t)
 		newCh.Reject(ssh.UnknownChannelType, fmt.Sprintf("Unknown channel type: %v", t))
 		return
 	}
@@ -109,24 +115,42 @@ func (m *mockDevice) handleChannel(newCh ssh.NewChannel) {
 			case "shell":
 				ok = true
 				if len(req.Payload) > 0 {
+					log.Print("Payload provided with shell")
 					// We don't accept any commands, only the default shell
 					ok = false
 				}
+			default:
+				log.Printf("Unrecognized req type: %v", req.Type)
 			}
-			req.Reply(ok, nil)
+			if req.WantReply {
+				req.Reply(ok, nil)
+			}
 		}
 	}(reqs)
 
-	term := terminal.NewTerminal(ch, "> ")
+	term := terminal.NewTerminal(ch, m.prompt)
 
 	go func() {
 		defer ch.Close()
 		for {
 			line, err := term.ReadLine()
-			if err != nil {
+			if err != nil && err != io.EOF {
+				log.Printf("Unable to read line: %v", err)
 				break
 			}
-			fmt.Println("YOU TYPED: " + line)
+			log.Printf("User typed: %v", line)
+			if resp, ok := m.responses[line]; !ok {
+				log.Print("Unrecognized line, ignoring")
+			} else {
+				log.Printf("Responding with: %v", resp)
+				if _, err := term.Write([]byte(resp)); err != nil {
+					log.Printf("Error responding: %v", err)
+				}
+			}
+			if err == io.EOF {
+				log.Print("EOF")
+				break
+			}
 		}
 	}()
 }

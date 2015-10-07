@@ -13,16 +13,38 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"net/http"
+	"strconv"
 )
 
 var baseDirectory string
-var tempDirectory string
-var gitRepoDirectory string
-var gitPullDataDirectory string
+var globalTempDirectory string
 var coverageEnabled bool
 
-func newWorkingConfig() *config.Config {
+type context struct {
+	tempDirectory string
+	gitRepoDirectory string
+	gitPullDataDirectory string
+}
+
+func newContext() *context {
+	tempDirectory, err := ioutil.TempDir(globalTempDirectory, "fusty-test")
+	So(err, ShouldBeNil)
+	gitRepoDirectory, err := ioutil.TempDir(tempDirectory, "git-repo-temp")
+	So(err, ShouldBeNil)
+	gitPullDataDirectory, err := ioutil.TempDir(tempDirectory, "git-pull-temp")
+	So(err, ShouldBeNil)
+	return &context{
+		tempDirectory:tempDirectory,
+		gitRepoDirectory:gitRepoDirectory,
+		gitPullDataDirectory:gitPullDataDirectory,
+	}
+}
+
+func (ctx *context) newWorkingConfig() *config.Config {
 	return &config.Config{
+		Ip: "127.0.0.1",
+		Port: 9400,
 		JobStore: &config.JobStore{
 			Type: "local",
 			JobStoreLocal: &config.JobStoreLocal{
@@ -31,8 +53,13 @@ func newWorkingConfig() *config.Config {
 						JobSchedule: &config.JobSchedule{
 							Cron: "0 0 * * * * *",
 						},
-						JobCommand: &config.JobCommand{
-							Inline: []string{"command1", "command2"},
+						Commands: []*config.JobCommand{
+							&config.JobCommand{
+								Command: "command1",
+							},
+							&config.JobCommand{
+								Command: "command2",
+							},
 						},
 					},
 				},
@@ -63,9 +90,9 @@ func newWorkingConfig() *config.Config {
 		DataStore: &config.DataStore{
 			Type: "git",
 			DataStoreGit: &config.DataStoreGit{
-				Url:      gitRepoDirectory,
+				Url:      ctx.gitRepoDirectory,
 				PoolSize: 1,
-				DataDir:  gitPullDataDirectory,
+				DataDir:  ctx.gitPullDataDirectory,
 				DataStoreGitUser: &config.DataStoreGitUser{
 					FriendlyName: "John Doe",
 					Email:        "jdoe@example.com",
@@ -87,7 +114,7 @@ func init() {
 	if dir, err := ioutil.TempDir("", "fusty-test"); err != nil {
 		panic(err)
 	} else {
-		tempDirectory = dir
+		globalTempDirectory = dir
 	}
 	for _, arg := range os.Args {
 		if strings.HasPrefix(arg, "-test.coverprofile=") {
@@ -95,31 +122,19 @@ func init() {
 			break
 		}
 	}
-	// TODO: initialize git
-	if dir, err := ioutil.TempDir(tempDirectory, "git-repo-temp"); err != nil {
-		panic(err)
-	} else {
-		gitRepoDirectory = dir
-	}
-	if dir, err := ioutil.TempDir(tempDirectory, "git-pull-temp"); err != nil {
-		panic(err)
-	} else {
-		gitPullDataDirectory = dir
-	}
 }
 
-func cleanAndReinitializeGitRepo(c C) {
-	c.So(os.RemoveAll(gitRepoDirectory), ShouldBeNil)
-	c.So(os.MkdirAll(gitRepoDirectory, os.ModePerm), ShouldBeNil)
-	cmd := exec.Command("git", "init", "--bare", gitRepoDirectory)
+func (ctx *context) initializeGitRepo(c C) {
+	c.So(os.MkdirAll(ctx.gitRepoDirectory, os.ModePerm), ShouldBeNil)
+	cmd := exec.Command("git", "init", "--bare", ctx.gitRepoDirectory)
 	_, err := cmd.CombinedOutput()
 	c.So(err, ShouldBeNil)
 	// We have to create a master branch which means we have to clone, commit empty, push a master, and then delete
-	tempDir := filepath.Join(tempDirectory, "gittemp")
+	tempDir := filepath.Join(ctx.tempDirectory, "gittemp")
 	c.So(os.RemoveAll(tempDir), ShouldBeNil)
 	defer os.RemoveAll(tempDir)
 	c.So(os.MkdirAll(tempDir, os.ModePerm), ShouldBeNil)
-	cmd = exec.Command("git", "clone", gitRepoDirectory, tempDir)
+	cmd = exec.Command("git", "clone", ctx.gitRepoDirectory, tempDir)
 	cmd.Dir = tempDir
 	_, err = cmd.CombinedOutput()
 	c.So(err, ShouldBeNil)
@@ -134,11 +149,11 @@ func cleanAndReinitializeGitRepo(c C) {
 }
 
 func tearDown() {
-	os.RemoveAll(tempDirectory)
+	os.RemoveAll(globalTempDirectory)
 }
 
-func withTempConfig(c C, conf *config.Config, f func(string)) {
-	confFile, err := writeConfigFile(conf)
+func (ctx *context) withTempConfig(c C, conf *config.Config, f func(string)) {
+	confFile, err := ctx.writeConfigFile(conf)
 	if confFile != nil {
 		defer os.Remove(confFile.Name())
 	}
@@ -146,8 +161,8 @@ func withTempConfig(c C, conf *config.Config, f func(string)) {
 	f(confFile.Name())
 }
 
-func writeConfigFile(conf *config.Config) (f *os.File, err error) {
-	f, err = ioutil.TempFile(tempDirectory, "fusty-config")
+func (ctx *context) writeConfigFile(conf *config.Config) (f *os.File, err error) {
+	f, err = ioutil.TempFile(ctx.tempDirectory, "fusty-config")
 	if err == nil {
 		defer f.Close()
 		if bytes, e := conf.ToBytes(); e != nil {
@@ -264,7 +279,7 @@ func (s *stdoutWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func startControllerInBackground(c C, conf *config.Config) *fustyCmd {
+func (ctx *context) startControllerInBackground(c C, conf *config.Config) *fustyCmd {
 	log.Print("Starting controller")
 	var controllerCmd *fustyCmd
 	Reset(func() {
@@ -272,20 +287,33 @@ func startControllerInBackground(c C, conf *config.Config) *fustyCmd {
 			controllerCmd.Stop()
 		}
 	})
-	confFile, err := writeConfigFile(conf)
+	confFile, err := ctx.writeConfigFile(conf)
 	c.So(err, ShouldBeNil)
 	bytes, err := conf.ToBytesPretty()
 	c.So(err, ShouldBeNil)
 	log.Printf("Running controller with config and waiting 3 seconds to start: %v", string(bytes))
 	controllerCmd = runFusty(c, "controller", "-config", confFile.Name(), "-verbose")
 	go controllerCmd.RunAndStreamToOutput("Controller out: ")
-	// Wait just a sec and confirm it's still running
-	time.Sleep(time.Duration(3) * time.Second)
+	// Try once a second for 10 seconds to see if up
+	url := "http://" + conf.Ip + ":" + strconv.Itoa(conf.Port) + "/worker/ping"
+	success := false
+	for i :=0; i < 5; i++ {
+		time.Sleep(time.Second)
+		if resp, err := http.Get(url); err == nil && resp.StatusCode == http.StatusOK {
+			success = true
+			break
+		}
+	}
+	if !success {
+		log.Printf("Unable to connect to controller at %v", url)
+		controllerCmd.Stop()
+		c.So(success, ShouldBeTrue)
+	}
 	c.So(controllerCmd.Exited(), ShouldBeFalse)
 	return controllerCmd
 }
 
-func startWorkerInBackground(c C) *fustyCmd {
+func (ctx *context) startWorkerInBackground(c C) *fustyCmd {
 	log.Print("Starting worker")
 	var workerCmd *fustyCmd
 	Reset(func() {
@@ -309,4 +337,34 @@ func startWorkerInBackground(c C) *fustyCmd {
 	workerCmd = runFusty(c, args...)
 	go workerCmd.RunAndStreamToOutput("Worker out: ")
 	return workerCmd
+}
+
+func (ctx *context) assertValidGitCommit(fileContentSubstring string) {
+	gitAssertDir, err := ioutil.TempDir(ctx.tempDirectory, "git-assert-temp")
+	So(err, ShouldBeNil)
+	So(os.MkdirAll(gitAssertDir, os.ModePerm), ShouldBeNil)
+	runInDir(gitAssertDir, "git", "clone", ctx.gitRepoDirectory, gitAssertDir)
+
+	authorName := runInDir(gitAssertDir, "git", "log", "-1", "--pretty=%an")
+	So(authorName, ShouldEqual, "John Doe")
+	authorEmail := runInDir(gitAssertDir, "git", "log", "-1", "--pretty=%ae")
+	So(authorEmail, ShouldEqual, "jdoe@example.com")
+	commitComment := runInDir(gitAssertDir, "git", "log", "-1", "--pretty=%B")
+	So(commitComment, ShouldContainSubstring, "Job: simple\n")
+	So(commitComment, ShouldContainSubstring, "Device: local\n")
+	// TODO: Some extra validation of the values here?
+	So(commitComment, ShouldContainSubstring, "Expected Run Date:")
+	So(commitComment, ShouldContainSubstring, "Start Date:")
+	So(commitComment, ShouldContainSubstring, "End On:")
+	So(commitComment, ShouldContainSubstring, "Elapsed Time:")
+	filesText := runInDir(gitAssertDir, "git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD")
+	filesUpdated := strings.Split(filesText, "\n")
+	// TODO: Fix this when checking for other types of git structures
+	So(len(filesUpdated), ShouldEqual, 1)
+	So(filesUpdated, ShouldContain, "by_device/local/simple")
+
+	// Now read the the file and make sure it looks right
+	fileBytes, err := ioutil.ReadFile(filepath.Join(gitAssertDir, "by_device/local/simple"))
+	So(err, ShouldBeNil)
+	So(string(fileBytes), ShouldContainSubstring, fileContentSubstring)
 }

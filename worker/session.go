@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"strconv"
+	"time"
 )
 
 type session interface {
@@ -30,6 +31,8 @@ type sessionShell interface {
 	io.Reader
 	io.Writer
 	close() error
+	// Error can be eof
+	readFor(duration time.Duration) ([]byte, error)
 }
 
 func newSession(device *model.Device) (session, error) {
@@ -138,4 +141,44 @@ func (s *sshSessionShell) close() error {
 		ret = err
 	}
 	return fmt.Errorf("Unable to close shell: %v", ret)
+}
+
+func (s *sshSessionShell) readFor(duration time.Duration) ([]byte, error) {
+	byteChan := make(chan []byte, 1)
+	errorChan := make(chan error, 1)
+	quitChan := make(chan bool, 1)
+	go func() {
+		tempBuf := make([]byte, 500)
+		for {
+			select {
+			case <-quitChan:
+				return
+			default:
+				n, err := s.Read(tempBuf)
+				if n > 0 {
+					currSet := make([]byte, n)
+					copy(currSet, tempBuf)
+					byteChan <- currSet
+				}
+				if err != nil {
+					errorChan <- err
+					return
+				}
+			}
+		}
+	}()
+	retBytes := []byte{}
+	timeoutChan := time.After(duration)
+	for {
+		select {
+		case buf := <-byteChan:
+			retBytes = append(retBytes, buf...)
+		case <-timeoutChan:
+			quitChan <- true
+			return retBytes, nil
+		case err := <-errorChan:
+			return retBytes, err
+		}
+	}
+	panic("Can't get here")
 }

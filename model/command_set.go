@@ -103,5 +103,14 @@ func (c *CommandSetCommand) Validate() []error {
 }
 
 func (c *CommandSetCommand) DeepCopy() *CommandSetCommand {
-	return &CommandSetCommand{Command: c.Command}
+	ret := &CommandSetCommand{
+		Command: c.Command,
+		Expect:        make([]string, len(c.Expect)),
+		ExpectNot:     make([]string, len(c.ExpectNot)),
+		Timeout:       c.Timeout,
+		ImplicitEnter: c.ImplicitEnter,
+	}
+	copy(ret.Expect, c.Expect)
+	copy(ret.ExpectNot, c.ExpectNot)
+	return ret
 }

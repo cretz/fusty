@@ -1,7 +1,6 @@
 package worker
 
 import (
-	"bufio"
 	"bytes"
 	"compress/gzip"
 	"errors"
@@ -68,18 +67,32 @@ func runJob(sess session, job *model.Job) ([]byte, error) {
 }
 
 func runCommands(sess session, job *model.Job) ([]byte, error) {
+	if Verbose {
+		log.Printf("Connecting to shell to run job %v", job.Name)
+	}
 	shell, err := sess.shell()
 	if err != nil {
 		return nil, fmt.Errorf("Unable to open shell: %v", err)
 	}
 	defer shell.close()
 	buff := []byte{}
-	shellReader := bufio.NewReader(shell)
 	for _, cmd := range job.CommandSet.Commands {
+		if Verbose {
+			log.Printf("Running command '%v' for job %v", cmd.Command, job.Name)
+		}
+		// Clear out all pending output before running the command by reading everything for 100 ms
+		b, err := shell.readFor(time.Duration(100) * time.Millisecond)
+		buff = append(buff, b...)
+		if err != nil && err != io.EOF {
+			return buff, fmt.Errorf("Failure reading output before command '%v': %v", cmd.Command, err)
+		}
 		if _, err := shell.Write([]byte(cmd.Command)); err != nil {
 			return buff, fmt.Errorf("Error writing command '%v': %v", cmd.Command, err)
 		}
 		if cmd.ImplicitEnter {
+			if Verbose {
+				log.Printf("Sending implicit enter for job %v", job.Name)
+			}
 			if _, err := shell.Write([]byte{13}); err != nil {
 				return buff, fmt.Errorf("Error entering after command '%v': %v", cmd.Command, err)
 			}
@@ -108,35 +121,40 @@ func runCommands(sess session, job *model.Job) ([]byte, error) {
 		}
 
 		matchSuccess := false
-		thisBytes := []byte{}
+		thisCommandBytes := []byte{}
+		if Verbose {
+			log.Printf("Reading log output for command '%v'", cmd.Command)
+		}
+		CommandLoop:
 		for i := 0; i < cmd.Timeout; i++ {
-			time.Sleep(time.Second)
-			// Fetch all output since our last go
-			for {
-				n, err := shellReader.Read(thisBytes[len(thisBytes):])
-				if n > 0 {
-					// Write what we read
-					buff = append(buff, thisBytes[len(thisBytes)-n:]...)
-				}
-				if err != nil && err != io.EOF {
-					return buff, fmt.Errorf("Failure reading output of command '%v': %v", cmd.Command, err)
-				}
-				if n == 0 {
-					break
-				}
+			// Read the contents for one second
+			b, err := shell.readFor(time.Second)
+			thisCommandBytes = append(thisCommandBytes, b...)
+			buff = append(buff, b...)
+			if Verbose && len(b) > 0 {
+				log.Printf("Current output for command '%v':\n----\n%v\n----", cmd.Command, string(thisCommandBytes))
+			}
+			if err != nil && err != io.EOF {
+				return buff, fmt.Errorf("Failure reading output of command '%v': %v", cmd.Command, err)
 			}
 			// Check for failure expectations
 			for i, notExpr := range expectNotRegex {
-				if notExpr.Match(thisBytes) {
+				if notExpr.Match(thisCommandBytes) {
+					if Verbose {
+						log.Printf("Matched unexpected pattern %v", cmd.Expect[i])
+					}
 					return buff, fmt.Errorf("Output of command '%v' matched failure pattern: %v",
 						cmd.Command, cmd.ExpectNot[i])
 				}
 			}
 			// Now for success
-			for _, expr := range expectRegex {
-				if expr.Match(thisBytes) {
+			for i, expr := range expectRegex {
+				if expr.Match(thisCommandBytes) {
+					if Verbose {
+						log.Printf("Matched expected pattern %v", cmd.Expect[i])
+					}
 					matchSuccess = true
-					break
+					break CommandLoop
 				}
 			}
 		}
