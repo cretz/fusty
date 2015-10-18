@@ -5,12 +5,12 @@ import (
 	"gitlab.com/cretz/fusty/config"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
 	"path/filepath"
 	"strconv"
-	"io"
 )
 
 type mockDevice struct {
@@ -21,7 +21,7 @@ type mockDevice struct {
 	serverConfig *ssh.ServerConfig
 	listener     net.Listener
 	responses    map[string]string
-	prompt string
+	prompt       string
 }
 
 // Some help from https://gist.github.com/jpillora/b480fde82bff51a06238 and

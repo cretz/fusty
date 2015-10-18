@@ -4,17 +4,19 @@ import (
 	"errors"
 	"fmt"
 	"gitlab.com/cretz/fusty/config"
+	"strings"
 )
 
 type Job struct {
-	Name        string `json:"name"`
-	*CommandSet `json:"command_set"`
-	*FileSet    `json:"file_set"`
-	Schedule    `json:"-"`
+	Name           string `json:"name"`
+	*CommandSet    `json:"command_set"`
+	*FileSet       `json:"file_set"`
+	Schedule       `json:"-"`
+	TemplateValues map[string]string `json:"template_values"`
 }
 
 func NewDefaultJob(name string) *Job {
-	return &Job{Name: name}
+	return &Job{Name: name, TemplateValues: map[string]string{}}
 }
 
 func (j *Job) ApplyConfig(conf *config.Job) error {
@@ -40,7 +42,26 @@ func (j *Job) ApplyConfig(conf *config.Job) error {
 			j.Schedule = sched
 		}
 	}
+	for key, value := range conf.TemplateValues {
+		j.TemplateValues[key] = value
+	}
 	return nil
+}
+
+func (j *Job) ApplyTemplateValues() {
+	if j.CommandSet != nil {
+		for key, value := range j.TemplateValues {
+			for _, cmd := range j.CommandSet.Commands {
+				cmd.Command = strings.Replace(cmd.Command, "{{"+key+"}}", value, -1)
+				for index, expect := range cmd.Expect {
+					cmd.Expect[index] = strings.Replace(expect, "{{"+key+"}}", value, -1)
+				}
+				for index, expect := range cmd.ExpectNot {
+					cmd.ExpectNot[index] = strings.Replace(expect, "{{"+key+"}}", value, -1)
+				}
+			}
+		}
+	}
 }
 
 func (j *Job) DeepCopy() *Job {
@@ -48,14 +69,18 @@ func (j *Job) DeepCopy() *Job {
 	// so we have to do this ourselves.
 	// TODO: write unit tests to confirm functionality doesn't change
 	job := &Job{
-		Name:     j.Name,
-		Schedule: j.Schedule.DeepCopy(),
+		Name:           j.Name,
+		Schedule:       j.Schedule.DeepCopy(),
+		TemplateValues: map[string]string{},
 	}
 	if j.CommandSet != nil {
 		job.CommandSet = j.CommandSet.DeepCopy()
 	}
 	if j.FileSet != nil {
 		job.FileSet = j.FileSet.DeepCopy()
+	}
+	for key, value := range j.TemplateValues {
+		job.TemplateValues[key] = value
 	}
 	return job
 }

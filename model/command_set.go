@@ -104,7 +104,7 @@ func (c *CommandSetCommand) Validate() []error {
 
 func (c *CommandSetCommand) DeepCopy() *CommandSetCommand {
 	ret := &CommandSetCommand{
-		Command: c.Command,
+		Command:       c.Command,
 		Expect:        make([]string, len(c.Expect)),
 		ExpectNot:     make([]string, len(c.ExpectNot)),
 		Timeout:       c.Timeout,

@@ -14,12 +14,14 @@ Open Questions:
 * When workers are requesting tags of work, is it ok to get all for their first tag, then some for their next and so on,
   or should I balance across requested tags?
 * JSON sucks at config. Can I full-on switch to toml (https://github.com/BurntSushi/toml), or should I accept both?
+* Take a look at https://github.com/Masterminds/vcs
 
 For MVP:
 * Embed web application:
   * Web application by default allowed to write the configuration, so setup can really be bootstrapped in a browser, yay
   * Document the API that both workers and other devs can use
   * Probably embed pieces with https://github.com/jteeuwen/go-bindata
+  * http://blog.davidvassallo.me/2015/06/17/practical-embedding-in-golang/
 * Enable self-restarts for upgrades or certain config changes
   * Use https://github.com/facebookgo/grace or https://github.com/fvbock/endless to drop nothing
   * Allow self-update from internet ONLY if the user requests (i.e. no automatic phoning home)

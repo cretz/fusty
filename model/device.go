@@ -58,6 +58,9 @@ func (d *Device) ApplyConfig(conf *config.Device) error {
 			if err := existing.ApplyConfig(job); err != nil {
 				return fmt.Errorf("Unable to configure job %v: %v", name, err)
 			}
+			// We are also going to apply all template values in the
+			// job now that we're at the bottom of the job config chain
+			existing.ApplyTemplateValues()
 		}
 	}
 	return nil

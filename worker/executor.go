@@ -125,7 +125,7 @@ func runCommands(sess session, job *model.Job) ([]byte, error) {
 		if Verbose {
 			log.Printf("Reading log output for command '%v'", cmd.Command)
 		}
-		CommandLoop:
+	CommandLoop:
 		for i := 0; i < cmd.Timeout; i++ {
 			// Read the contents for one second
 			b, err := shell.readFor(time.Second)

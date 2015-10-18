@@ -88,6 +88,7 @@ type Job struct {
 	Commands       []*JobCommand       `json:"commands,omitempty"`
 	CommandGeneric *JobCommand         `json:"command_generic,omitempty"`
 	JobFile        map[string]*JobFile `json:"file,omitempty"`
+	TemplateValues map[string]string   `json:"template_values,omitempty"`
 }
 
 type JobSchedule struct {

@@ -5,16 +5,16 @@ import (
 	"gitlab.com/cretz/fusty/config"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
-	"net/http"
-	"strconv"
 )
 
 var baseDirectory string
@@ -22,8 +22,8 @@ var globalTempDirectory string
 var coverageEnabled bool
 
 type context struct {
-	tempDirectory string
-	gitRepoDirectory string
+	tempDirectory        string
+	gitRepoDirectory     string
 	gitPullDataDirectory string
 }
 
@@ -35,15 +35,15 @@ func newContext() *context {
 	gitPullDataDirectory, err := ioutil.TempDir(tempDirectory, "git-pull-temp")
 	So(err, ShouldBeNil)
 	return &context{
-		tempDirectory:tempDirectory,
-		gitRepoDirectory:gitRepoDirectory,
-		gitPullDataDirectory:gitPullDataDirectory,
+		tempDirectory:        tempDirectory,
+		gitRepoDirectory:     gitRepoDirectory,
+		gitPullDataDirectory: gitPullDataDirectory,
 	}
 }
 
 func (ctx *context) newWorkingConfig() *config.Config {
 	return &config.Config{
-		Ip: "127.0.0.1",
+		Ip:   "127.0.0.1",
 		Port: 9400,
 		JobStore: &config.JobStore{
 			Type: "local",
@@ -297,7 +297,7 @@ func (ctx *context) startControllerInBackground(c C, conf *config.Config) *fusty
 	// Try once a second for 10 seconds to see if up
 	url := "http://" + conf.Ip + ":" + strconv.Itoa(conf.Port) + "/worker/ping"
 	success := false
-	for i :=0; i < 5; i++ {
+	for i := 0; i < 5; i++ {
 		time.Sleep(time.Second)
 		if resp, err := http.Get(url); err == nil && resp.StatusCode == http.StatusOK {
 			success = true

@@ -86,9 +86,9 @@ func defaultDeviceGenericJob() *config.Job {
 	timeout := 20
 	return &config.Job{
 		CommandGeneric: &config.JobCommand{
-			Expect: []string{"prompt>"},
+			Expect:    []string{"prompt>"},
 			ExpectNot: []string{"ERROR"},
-			Timeout: &timeout,
+			Timeout:   &timeout,
 		},
 		Commands: []*config.JobCommand{
 			&config.JobCommand{Command: "command1"},

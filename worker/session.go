@@ -180,5 +180,4 @@ func (s *sshSessionShell) readFor(duration time.Duration) ([]byte, error) {
 			return retBytes, err
 		}
 	}
-	panic("Can't get here")
 }

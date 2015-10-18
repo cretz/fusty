@@ -17,4 +17,4 @@ settings and the defaults are below.
   * `user` - The username to login as
   * `pass` - The password to use to login. Currently only username/password authentication is supported. In the future
     other forms may be supported.
-* `jobs` - Required collection of jobs to run. Each job can have its own settings. Currently these are undefined.
+* `jobs` - Required collection of jobs to run. Each job can have its own settings that override the jobs settings.

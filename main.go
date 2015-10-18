@@ -8,8 +8,8 @@ import (
 	"gitlab.com/cretz/fusty/worker"
 	"log"
 	"os"
-	"strings"
 	"runtime"
+	"strings"
 )
 
 func main() {

@@ -40,10 +40,25 @@ settings and the defaults are below.
   concatenated in alphabetical order.
   * `FILEPATH` - The file path to fetch.
     * `compression` - If present, this is the compression used by the file. Only `gzip` supported currently.
+* `template_values` - An object with keys as template variable names and values as template values. See below for more
+  information.
 
-### Prompt Conditions
+## Template Variables
 
+The text for `command`, `expect`, and `expect_not` can use a "template variable". A template variable is a variable that
+can be replaced by something inheriting this configuration. For instance, a job can set the value of a template variable
+that is used in a generic. Similarly a device-job entry can set the value of a template variable used by the job or the
+job generic.
 
+Template variables are words that are surrounded by two curly braces. Therefore a command that is `foo {{bar}}` can have
+a template variable named `bar` that will be replaced in the text for each device the job runs. So if the `bar`
+template variable was given the value `baz`, the command would in practice be `foo baz`. This can come in very handy for
+things like network-device enable passwords. The password could be `{{enable_password}}` in the job and then the job
+entry for the device could have an `enable_password` template value that is device specific.
+
+Template variables are set in the `template_values` configuration object in the job generic, job, or device-job entry.
+If a template variable is not present, no replacement is made. There is currently no validation for whether all template
+variables are provided.
 
 ## Job Distribution
 
