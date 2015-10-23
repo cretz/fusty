@@ -117,7 +117,7 @@ local job stores. Below is an example of a local job store configuration in JSON
     "jobs": {
 
       // This is the name of the job that will be present in the data store and is referenced from the device
-      "cisco_show_run" = {
+      "cisco_show_run": {
 
         // The generic settings to inherit. Default is "default"
         // "generic": "default",

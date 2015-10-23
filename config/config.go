@@ -92,7 +92,7 @@ type Job struct {
 }
 
 type JobSchedule struct {
-	Cron     string `json:"string,omitempty"`
+	Cron     string `json:"cron,omitempty"`
 	Duration string `json:"duration,omitempty"`
 	Iso8601  string `json:"iso_8601,omitempty"`
 	Fixed    int64  `json:"fixed,omitempty"`
