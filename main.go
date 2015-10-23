@@ -52,7 +52,7 @@ func runController(args ...string) error {
 func runWorker(args ...string) error {
 	flags := flag.NewFlagSet("flags", flag.ContinueOnError)
 	conf := &worker.Config{}
-	flags.StringVar(&conf.ControllerUrl, "controller", "", "Base URL for controller")
+	flags.StringVar(&conf.ControllerUrl, "controller", "http://127.0.0.1:9400", "Base URL for controller")
 	var tags multistring
 	flags.Var(&tags, "tag", "One or more tags")
 	flags.IntVar(&conf.SleepSeconds, "sleep", 15, "Sleep seconds")
