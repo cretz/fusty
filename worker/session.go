@@ -3,9 +3,13 @@ package worker
 import (
 	"errors"
 	"fmt"
-	"github.com/pkg/sftp"
 	"gitlab.com/cretz/fusty/model"
-	"golang.org/x/crypto/ssh"
+	// Does not include CBC ciphers, ref: https://groups.google.com/forum/#!topic/golang-nuts/J2XCsTsNQ9o
+	// TODO: decide if we like this guy's fork or if I should make my own
+	// "golang.org/x/crypto/ssh"
+	// "github.com/pkg/sftp"
+	"github.com/ScriptRock/crypto/ssh"
+	"github.com/ScriptRock/sftp"
 	"io"
 	"io/ioutil"
 	"log"
@@ -52,6 +56,10 @@ func (s *sshSession) authenticate(device *model.Device) error {
 		User: device.DeviceCredentials.User,
 		Auth: []ssh.AuthMethod{ssh.Password(device.DeviceCredentials.Pass)},
 	}
+	if device.DeviceProtocol.SshDeviceProtocol.IncludeCbcCiphers {
+		sshConf.Config = ssh.Config{Ciphers: ssh.AllSupportedCiphers()}
+	}
+
 	hostPort := device.Host + ":" + strconv.Itoa(device.DeviceProtocol.SshDeviceProtocol.Port)
 	if Verbose {
 		log.Printf("Starting SSH session on %v for user %v", hostPort, device.DeviceCredentials.User)

@@ -8,6 +8,9 @@ be in a certain location under the `GOPATH` environment variable in order to fun
 Assuming that `GOPATH` is set to `foo/bar`, then the repository needs to be checked out at
 `foo/bar/src/gitlab.com/cretz/fusty`. This allows dependencies to be placed properly in their place.
 
+NOTE: If building on Windows due to a couple of issues, you must set the `GO15VENDOREXPERIMENT` environment variable to
+`1`. To understand why, please read the [README in vendor](/vendor/README.md).
+
 ## Building
 
 Assuming the environment is set up as above, run this at the repo root (i.e. `$GOPATH/src/gitlab.com/cretz/fusty`):

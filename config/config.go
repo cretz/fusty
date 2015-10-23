@@ -112,7 +112,7 @@ type JobFile struct {
 
 type DeviceStore struct {
 	Type              string `json:"type,omitempty"`
-	*DeviceStoreLocal `json:"local,omitemptyl"`
+	*DeviceStoreLocal `json:"local,omitempty"`
 }
 
 type DeviceStoreLocal struct {
@@ -135,7 +135,8 @@ type DeviceProtocol struct {
 }
 
 type DeviceProtocolSsh struct {
-	Port int `json:"port,omitempty"`
+	Port              int  `json:"port,omitempty"`
+	IncludeCbcCiphers bool `json:"include_cbc_ciphers,omitempty"`
 }
 
 type DeviceCredentials struct {

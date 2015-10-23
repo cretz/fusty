@@ -12,6 +12,9 @@ settings and the defaults are below.
   * `type` - Required if protocol present. The only acceptable value currently is "ssh".
   * `ssh` - Required if protocol present.
     * `port` - Required if protocol present. The port to connect to SSH on.
+    * `include_cbc_ciphers` - Optional boolean. By default this is false. If true, the `aes128-cbc`, `aes192-cbc`,
+      `aes256-cbc`, and `3des-cbc` ciphers will be supported. This is discouraged as CBC ciphers are known to be
+      insecure.
 * `tags` - Optional collection of tag strings. This allows workers to choose specific devices.
 * `credentials` - Required.
   * `user` - The username to login as
