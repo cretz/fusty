@@ -37,8 +37,10 @@ func RunWorker(conf *Config) error {
 	// Our responsibility to validate config here
 	if conf.ControllerUrl == "" {
 		return errors.New("Controller URL required")
-	} else if _, err := url.Parse(conf.ControllerUrl); err != nil {
+	} else if url, err := url.Parse(conf.ControllerUrl); err != nil {
 		return fmt.Errorf("Invalid controller URL %v: %v", conf.ControllerUrl, err)
+	} else if url.Scheme == "" {
+		return fmt.Errorf("Invalid scheme, expecting http or https")
 	}
 	conf.ControllerUrl = strings.TrimRight(conf.ControllerUrl, "/")
 
