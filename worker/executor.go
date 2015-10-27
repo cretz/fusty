@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"gitlab.com/cretz/fusty/model"
-	"io"
 	"io/ioutil"
 	"log"
 	"regexp"
@@ -76,16 +75,18 @@ func runCommands(sess session, job *model.Job) ([]byte, error) {
 	}
 	defer shell.close()
 	buff := []byte{}
+	// Wait a second and clear output before first command
+	// TODO: this makes things a bit slow :-( ...maybe some kind of thing that knows when it's at the first prompt
+	time.Sleep(time.Second)
+	shell.bytesAndReset()
 	for _, cmd := range job.CommandSet.Commands {
 		if Verbose {
 			log.Printf("Running command '%v' for job %v", cmd.Command, job.Name)
 		}
-		// Clear out all pending output before running the command by reading everything for 100 ms
-		b, err := shell.readFor(time.Duration(100) * time.Millisecond)
-		buff = append(buff, b...)
-		if err != nil && err != io.EOF {
-			return buff, fmt.Errorf("Failure reading output before command '%v': %v", cmd.Command, err)
-		}
+		// Clear out all pending output before running the command by reading everything in the buffer
+		// (but still hold on to it)
+		buff = append(buff, shell.bytesAndReset()...)
+		// Write the command
 		if _, err := shell.Write([]byte(cmd.Command)); err != nil {
 			return buff, fmt.Errorf("Error writing command '%v': %v", cmd.Command, err)
 		}
@@ -93,7 +94,7 @@ func runCommands(sess session, job *model.Job) ([]byte, error) {
 			if Verbose {
 				log.Printf("Sending implicit enter for job %v", job.Name)
 			}
-			if _, err := shell.Write([]byte{13}); err != nil {
+			if _, err := shell.Write([]byte{10}); err != nil {
 				return buff, fmt.Errorf("Error entering after command '%v': %v", cmd.Command, err)
 			}
 		}
@@ -127,15 +128,11 @@ func runCommands(sess session, job *model.Job) ([]byte, error) {
 		}
 	CommandLoop:
 		for i := 0; i < cmd.Timeout; i++ {
-			// Read the contents for one second
-			b, err := shell.readFor(time.Second)
-			thisCommandBytes = append(thisCommandBytes, b...)
-			buff = append(buff, b...)
-			if Verbose && len(b) > 0 {
+			currBytes := shell.bytesAndReset()
+			thisCommandBytes = append(thisCommandBytes, currBytes...)
+			buff = append(buff, currBytes...)
+			if Verbose && len(thisCommandBytes) > 0 {
 				log.Printf("Current output for command '%v':\n----\n%v\n----", cmd.Command, string(thisCommandBytes))
-			}
-			if err != nil && err != io.EOF {
-				return buff, fmt.Errorf("Failure reading output of command '%v': %v", cmd.Command, err)
 			}
 			// Check for failure expectations
 			for i, notExpr := range expectNotRegex {
@@ -157,6 +154,8 @@ func runCommands(sess session, job *model.Job) ([]byte, error) {
 					break CommandLoop
 				}
 			}
+			// We go ahead and sleep the one second
+			time.Sleep(time.Second)
 		}
 		if len(expectRegex) > 0 && !matchSuccess {
 			return buff, fmt.Errorf("Output of command '%v' never matched expected pattern(s)", cmd.Command)

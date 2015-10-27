@@ -60,8 +60,11 @@ func newLocalJobStore(conf *config.JobStoreLocal) (*localJobStore, error) {
 			errs = append(errs, fmt.Errorf("Ambiguous job name %v", job.Name))
 			continue
 		}
-		if validationErrors := job.Validate(); len(validationErrors) > 0 {
-			errs = append(errs, validationErrors...)
+		validationErrors := job.Validate()
+		if len(validationErrors) > 0 {
+			for _, err := range validationErrors {
+				errs = append(errs, fmt.Errorf("Validation failed for job %v: %v", job.Name, err))
+			}
 			continue
 		}
 		store.jobs[job.Name] = job

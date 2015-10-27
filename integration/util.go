@@ -25,6 +25,7 @@ type context struct {
 	tempDirectory        string
 	gitRepoDirectory     string
 	gitPullDataDirectory string
+	verbose              bool
 }
 
 func newContext() *context {
@@ -292,7 +293,11 @@ func (ctx *context) startControllerInBackground(c C, conf *config.Config) *fusty
 	bytes, err := conf.ToBytesPretty()
 	c.So(err, ShouldBeNil)
 	log.Printf("Running controller with config and waiting 3 seconds to start: %v", string(bytes))
-	controllerCmd = runFusty(c, "controller", "-config", confFile.Name(), "-verbose")
+	args := []string{"controller", "-config", confFile.Name()}
+	if ctx.verbose {
+		args = append(args, "-verbose")
+	}
+	controllerCmd = runFusty(c, args...)
 	go controllerCmd.RunAndStreamToOutput("Controller out: ")
 	// Try once a second for 10 seconds to see if up
 	url := "http://" + conf.Ip + ":" + strconv.Itoa(conf.Port) + "/worker/ping"
@@ -329,17 +334,26 @@ func (ctx *context) startWorkerInBackground(c C) *fustyCmd {
 		// the beginning and we only want to check the first run
 		"-sleep",
 		"1200",
-		"-verbose",
 		// We give a max of 1 because we only care about 1 execution
 		"-maxjobs",
 		"1",
+	}
+	if ctx.verbose {
+		args = append(args, "-verbose")
 	}
 	workerCmd = runFusty(c, args...)
 	go workerCmd.RunAndStreamToOutput("Worker out: ")
 	return workerCmd
 }
 
-func (ctx *context) assertValidGitCommit(fileContentSubstring string) {
+type gitAssertion struct {
+	job          string
+	device       string
+	filesUpdated []string
+	fileContents string
+}
+
+func (g *gitAssertion) assertValid(ctx *context) {
 	gitAssertDir, err := ioutil.TempDir(ctx.tempDirectory, "git-assert-temp")
 	So(err, ShouldBeNil)
 	So(os.MkdirAll(gitAssertDir, os.ModePerm), ShouldBeNil)
@@ -350,8 +364,8 @@ func (ctx *context) assertValidGitCommit(fileContentSubstring string) {
 	authorEmail := runInDir(gitAssertDir, "git", "log", "-1", "--pretty=%ae")
 	So(authorEmail, ShouldEqual, "jdoe@example.com")
 	commitComment := runInDir(gitAssertDir, "git", "log", "-1", "--pretty=%B")
-	So(commitComment, ShouldContainSubstring, "Job: simple\n")
-	So(commitComment, ShouldContainSubstring, "Device: local\n")
+	So(commitComment, ShouldContainSubstring, "Job: "+g.job+"\n")
+	So(commitComment, ShouldContainSubstring, "Device: "+g.device+"\n")
 	// TODO: Some extra validation of the values here?
 	So(commitComment, ShouldContainSubstring, "Expected Run Date:")
 	So(commitComment, ShouldContainSubstring, "Start Date:")
@@ -360,11 +374,15 @@ func (ctx *context) assertValidGitCommit(fileContentSubstring string) {
 	filesText := runInDir(gitAssertDir, "git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD")
 	filesUpdated := strings.Split(filesText, "\n")
 	// TODO: Fix this when checking for other types of git structures
-	So(len(filesUpdated), ShouldEqual, 1)
-	So(filesUpdated, ShouldContain, "by_device/local/simple")
+	So(len(filesUpdated), ShouldEqual, len(g.filesUpdated))
+	for _, fileUpdated := range g.filesUpdated {
+		So(filesUpdated, ShouldContain, fileUpdated)
+	}
 
 	// Now read the the file and make sure it looks right
-	fileBytes, err := ioutil.ReadFile(filepath.Join(gitAssertDir, "by_device/local/simple"))
+	fileBytes, err := ioutil.ReadFile(filepath.Join(gitAssertDir, g.filesUpdated[0]))
 	So(err, ShouldBeNil)
-	So(string(fileBytes), ShouldContainSubstring, fileContentSubstring)
+	// Change /r/n to /n
+	So(strings.Replace(string(fileBytes), "\r\n", "\n", -1),
+		ShouldContainSubstring, strings.Replace(strings.TrimSpace(string(fileBytes)), "\r\n", "\n", -1))
 }

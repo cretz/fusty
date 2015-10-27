@@ -5,7 +5,9 @@ package integration
 import (
 	. "github.com/smartystreets/goconvey/convey"
 	"gitlab.com/cretz/fusty/config"
+	"io/ioutil"
 	"log"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -20,39 +22,51 @@ func TestSimpleSftp(t *testing.T) {
 		// This config already has the data store set up properly
 		conf := ctx.newWorkingConfig()
 
-		Convey("When a Juniper emulated environment is running", func(c C) {
-			juniper := newDefaultEmulatedJuniperDevice()
-			juniper.assertOnline()
+		Convey("When the Linux VM is running", func(c C) {
 
 			// Set up one job every 3 seconds
-			conf.JobStore.JobStoreLocal.JobGenerics = map[string]*config.Job{"juniper": juniper.genericJob()}
+			conf.JobStore.JobStoreLocal.JobGenerics = map[string]*config.Job{
+				"linux_file_job": &config.Job{
+					Type: "file",
+					JobFile: map[string]*config.JobFile{
+						"/vagrant/sample-config.txt.gz": &config.JobFile{Compression: "gzip"},
+					},
+				},
+			}
 			conf.JobStore.JobStoreLocal.Jobs = map[string]*config.Job{
-				"simple": &config.Job{
-					Generic:     "juniper",
+				"get_file": &config.Job{
+					Generic:     "linux_file_job",
 					JobSchedule: &config.JobSchedule{Cron: "*/3 * * * * * *"},
 				},
 			}
 
-			// For the Juniper VM
-			conf.DeviceStore.DeviceStoreLocal.DeviceGenerics =
-				map[string]*config.Device{"juniper": juniper.genericDevice()}
+			// For the device
+			conf.DeviceStore.DeviceStoreLocal.DeviceGenerics = map[string]*config.Device{
+				"linux_vm_base": &config.Device{
+					Host: "127.0.0.1",
+					DeviceProtocol: &config.DeviceProtocol{
+						Type:              "ssh",
+						DeviceProtocolSsh: &config.DeviceProtocolSsh{Port: 3222},
+					},
+					DeviceCredentials: &config.DeviceCredentials{User: "vagrant", Pass: "vagrant"},
+				},
+			}
 			conf.DeviceStore.DeviceStoreLocal.Devices = map[string]*config.Device{
-				"local": &config.Device{
-					Generic: "juniper",
+				"local_linux_vm": &config.Device{
+					Generic: "linux_vm_base",
 					Jobs: map[string]*config.Job{
-						"simple": &config.Job{},
+						"get_file": &config.Job{},
 					},
 				},
 			}
 
-			Convey("And the controller and worker are started for 5 seconds to perform the backup", func(c C) {
+			Convey("And the controller and worker are started for 10 seconds to perform the backup", func(c C) {
 				// Fire up the controller and worker
 				controller := ctx.startControllerInBackground(c, conf)
 				worker := ctx.startWorkerInBackground(c)
 
-				// Wait for 5 seconds and shut em down...
-				log.Print("Waiting 5 seconds and then shutting down controller and worker")
-				time.Sleep(time.Duration(5) * time.Second)
+				log.Print("Waiting 10 seconds and then shutting down controller and worker")
+				time.Sleep(time.Duration(10) * time.Second)
 				So(worker.Stop(), ShouldBeNil)
 				So(controller.Stop(), ShouldBeNil)
 				time.Sleep(time.Duration(1) * time.Second)
@@ -60,7 +74,17 @@ func TestSimpleSftp(t *testing.T) {
 				So(worker.Exited(), ShouldBeTrue)
 
 				Convey("Then the git commit should be accurate", func(c C) {
-					ctx.assertValidGitCommit("ge-0/0/0")
+					//ctx.assertValidGitCommit("ge-0/0/0")
+					file, err := ioutil.ReadFile(filepath.Join(baseDirectory, "integration",
+						"emulated", "sample-config.txt"))
+					So(err, ShouldBeNil)
+					assertion := &gitAssertion{
+						job:          "get_file",
+						device:       "local_linux_vm",
+						filesUpdated: []string{"by_device/local_linux_vm/get_file"},
+						fileContents: string(file),
+					}
+					assertion.assertValid(ctx)
 				})
 			})
 		})

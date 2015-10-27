@@ -8,13 +8,14 @@ import (
 	// TODO: decide if we like this guy's fork or if I should make my own
 	// "golang.org/x/crypto/ssh"
 	// "github.com/pkg/sftp"
+	"bytes"
 	"github.com/ScriptRock/crypto/ssh"
 	"github.com/ScriptRock/sftp"
 	"io"
 	"io/ioutil"
 	"log"
 	"strconv"
-	"time"
+	"sync"
 )
 
 type session interface {
@@ -32,11 +33,9 @@ type session interface {
 }
 
 type sessionShell interface {
-	io.Reader
 	io.Writer
 	close() error
-	// Error can be eof
-	readFor(duration time.Duration) ([]byte, error)
+	bytesAndReset() []byte
 }
 
 func newSession(device *model.Device) (session, error) {
@@ -114,33 +113,35 @@ func (s *sshSession) shell() (sessionShell, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Unable to initiate session on %v: %v", s.device.Host, err)
 	}
-	sshOut, err := sess.StdoutPipe()
-	if err != nil {
-		sess.Close()
-		return nil, fmt.Errorf("Unable to open stdout pipe to external server: %v", err)
-	}
-	sshErr, err := sess.StderrPipe()
-	if err != nil {
-		sess.Close()
-		return nil, fmt.Errorf("Unable to open stderr pipe to external server: %v", err)
-	}
+	stdOutAndErrBuff := newThreadSafeByteBuffer()
+	sess.Stdout = stdOutAndErrBuff
+	sess.Stderr = stdOutAndErrBuff
 	sshIn, err := sess.StdinPipe()
 	if err != nil {
 		sess.Close()
-		return nil, fmt.Errorf("Unable to open stdin pipe to external server: %v", err)
+		return nil, fmt.Errorf("Unable to open stdin pipe on %v: %v", s.device.Host, err)
+	}
+	modes := ssh.TerminalModes{}
+	if err := sess.RequestPty("dumb", 80, 40, modes); err != nil {
+		sess.Close()
+		return nil, fmt.Errorf("Unable to request pty on %v: %v", s.device.Host, err)
+	}
+	if err := sess.Shell(); err != nil {
+		sess.Close()
+		return nil, fmt.Errorf("Unable to start shell on %v: %v", s.device.Host, err)
 	}
 	// TODO: what about request pty goodies?
 	return &sshSessionShell{
-		Reader:          io.MultiReader(sshOut, sshErr),
-		WriteCloser:     sshIn,
-		internalSession: sess,
+		WriteCloser:      sshIn,
+		internalSession:  sess,
+		stdOutAndErrBuff: stdOutAndErrBuff,
 	}, nil
 }
 
 type sshSessionShell struct {
-	io.Reader
 	io.WriteCloser
-	internalSession *ssh.Session
+	internalSession  *ssh.Session
+	stdOutAndErrBuff *threadSafeByteBuffer
 }
 
 func (s *sshSessionShell) close() error {
@@ -151,41 +152,32 @@ func (s *sshSessionShell) close() error {
 	return fmt.Errorf("Unable to close shell: %v", ret)
 }
 
-func (s *sshSessionShell) readFor(duration time.Duration) ([]byte, error) {
-	byteChan := make(chan []byte, 1)
-	errorChan := make(chan error, 1)
-	quitChan := make(chan bool, 1)
-	go func() {
-		tempBuf := make([]byte, 500)
-		for {
-			select {
-			case <-quitChan:
-				return
-			default:
-				n, err := s.Read(tempBuf)
-				if n > 0 {
-					currSet := make([]byte, n)
-					copy(currSet, tempBuf)
-					byteChan <- currSet
-				}
-				if err != nil {
-					errorChan <- err
-					return
-				}
-			}
-		}
-	}()
-	retBytes := []byte{}
-	timeoutChan := time.After(duration)
-	for {
-		select {
-		case buf := <-byteChan:
-			retBytes = append(retBytes, buf...)
-		case <-timeoutChan:
-			quitChan <- true
-			return retBytes, nil
-		case err := <-errorChan:
-			return retBytes, err
-		}
+func (s *sshSessionShell) bytesAndReset() []byte {
+	return s.stdOutAndErrBuff.bytesAndReset()
+}
+
+type threadSafeByteBuffer struct {
+	buff *bytes.Buffer
+	lock *sync.Mutex
+}
+
+func newThreadSafeByteBuffer() *threadSafeByteBuffer {
+	return &threadSafeByteBuffer{
+		buff: &bytes.Buffer{},
+		lock: &sync.Mutex{},
 	}
+}
+
+func (t *threadSafeByteBuffer) Write(p []byte) (n int, err error) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	return t.buff.Write(p)
+}
+
+func (t *threadSafeByteBuffer) bytesAndReset() []byte {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	// We want this to run first
+	defer t.buff.Reset()
+	return t.buff.Bytes()
 }

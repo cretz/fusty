@@ -5,22 +5,24 @@ import (
 	"fmt"
 	"gitlab.com/cretz/fusty/config"
 	"regexp"
+	"strings"
 )
 
 type CommandSet struct {
+	Generic  *CommandSetCommand   `json:"-"`
 	Commands []*CommandSetCommand `json:"commands"`
 }
 
 func NewDefaultCommandSet() *CommandSet {
-	return &CommandSet{Commands: []*CommandSetCommand{}}
+	return &CommandSet{Generic: NewDefaultCommandSetCommand(), Commands: []*CommandSetCommand{}}
 }
 
 func (c *CommandSet) ApplyConfig(conf *config.Job) {
+	if conf.CommandGeneric != nil {
+		c.Generic.ApplyConfig(conf.CommandGeneric)
+	}
 	for _, cmd := range conf.Commands {
-		setCmd := NewDefaultCommandSetCommand()
-		if conf.CommandGeneric != nil {
-			setCmd.ApplyConfig(conf.CommandGeneric)
-		}
+		setCmd := c.Generic.DeepCopy()
 		setCmd.ApplyConfig(cmd)
 		c.Commands = append(c.Commands, setCmd)
 	}
@@ -69,14 +71,30 @@ func (c *CommandSetCommand) ApplyConfig(conf *config.JobCommand) {
 		c.Command = conf.Command
 	}
 	// We don't pre-compile the regex because it's sent over the wire
-	c.Expect = append(c.Expect, conf.Expect...)
-	c.ExpectNot = append(c.ExpectNot, conf.ExpectNot...)
+	for _, re := range conf.Expect {
+		c.Expect = append(c.Expect, c.sanitizeRegex(re))
+	}
+	for _, re := range conf.ExpectNot {
+		c.ExpectNot = append(c.ExpectNot, c.sanitizeRegex(re))
+	}
 	if conf.Timeout != nil {
 		c.Timeout = *conf.Timeout
 	}
 	if conf.ImplicitEnter != nil {
 		c.ImplicitEnter = *conf.ImplicitEnter
 	}
+}
+
+func (c *CommandSetCommand) sanitizeRegex(regex string) string {
+	// We implicitly prepend .* if ^ isn't there and same at end for lack of $
+	// TODO: maybe this should check that the first char isn't a regex char instead?
+	if !strings.HasPrefix(regex, "^") {
+		regex = ".*" + regex
+	}
+	if !strings.HasSuffix(regex, "$") {
+		regex += ".*"
+	}
+	return regex
 }
 
 // Validate after all configs applied

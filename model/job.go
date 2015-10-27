@@ -20,21 +20,50 @@ func NewDefaultJob(name string) *Job {
 }
 
 func (j *Job) ApplyConfig(conf *config.Job) error {
-	switch conf.Type {
-	case "", "command":
-		if len(conf.Commands) > 0 {
+	// The type could already be determined by generic...
+	if conf.Type == "command" {
+		if j.FileSet != nil {
+			return errors.New("Generic file set in job of type command")
+		}
+		if j.CommandSet == nil {
 			j.CommandSet = NewDefaultCommandSet()
-			j.CommandSet.ApplyConfig(conf)
 		}
-	case "file":
-		if len(conf.JobFile) == 0 {
-			return errors.New("At least one file required")
+	} else if conf.Type == "file" {
+		if j.CommandSet != nil {
+			return errors.New("Generic command set in job of type file")
 		}
-		j.FileSet = NewDefaultFileSet()
-		j.FileSet.ApplyConfig(conf)
-	default:
+		if j.FileSet == nil {
+			j.FileSet = NewDefaultFileSet()
+		}
+	} else if conf.Type == "" {
+		// Default to command set
+		if j.FileSet == nil && j.CommandSet == nil {
+			j.CommandSet = NewDefaultCommandSet()
+		}
+	} else {
 		return fmt.Errorf("Unrecognized job type %v", conf.Type)
 	}
+	// Now we can apply config as necessary
+	if j.CommandSet != nil {
+		j.CommandSet.ApplyConfig(conf)
+	}
+	if j.FileSet != nil {
+		j.FileSet.ApplyConfig(conf)
+	}
+	//	switch conf.Type {
+	//	case "", "command":
+	//		if j.CommandSet == nil {
+	//			j.CommandSet = NewDefaultCommandSet()
+	//		}
+	//		j.CommandSet.ApplyConfig(conf)
+	//	case "file":
+	//		if j.FileSet == nil {
+	//			j.FileSet = NewDefaultFileSet()
+	//		}
+	//		j.FileSet.ApplyConfig(conf)
+	//	default:
+	//		return fmt.Errorf("Unrecognized job type %v", conf.Type)
+	//	}
 	if conf.JobSchedule != nil {
 		if sched, err := NewScheduleFromConfig(conf.JobSchedule); err != nil {
 			return fmt.Errorf("Invalid schedule: %v", err)
@@ -96,5 +125,5 @@ func (j *Job) Validate() []error {
 	if j.FileSet != nil {
 		errs = append(errs, j.FileSet.Validate()...)
 	}
-	return nil
+	return errs
 }

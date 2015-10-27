@@ -22,9 +22,14 @@ settings and the defaults are below.
   * `expect` - Optional array of string regex patterns. If any of these patterns is matched, the command is considered a
     success. If none of these is matched the command is considered a failure, even if nothing in `expect_not` matches.
     If `expect_not` is present and anything matches there, the failure emitted trumps any successful match here. If both
-    this and `expect_not` are not present the command is always considered a success.
+    this and `expect_not` are not present the command is always considered a success. If the regular expression doesn't
+    start with a caret (i.e. `^`) then all prefixes are matched (i.e. `.*` is implicitly prepended). Similarly if the
+    regular expression doesn't end with a dollar sign (i.e. `$`) then all suffixes are matched (i.e. `.*` is implicitly
+    appended). Remember that when using JSON config, two slashes might be needed to represent one in a JSON string
+    literal. 
   * `expect_not` - Optional array of string regex patterns. If any of these patterns is matched, the command is
-    considered a failure. This is true regardless of whether anything in `expect` matches.
+    considered a failure. This is true regardless of whether anything in `expect` matches. Regular expression rules are
+    the same as `expect`.
   * `timeout` - The optional amount of time in seconds to wait until something in `expect` or `expect_not` matches. If
     only `expect_not` is present, when the timeout is reached without a match the command is considered a success. If
     `expect` is present (regardless of whether `expect_not` is present), when timeout is reached without a match the

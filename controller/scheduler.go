@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"gitlab.com/cretz/fusty/model"
 	"log"
 	"sync"
@@ -20,6 +21,11 @@ func (c *Controller) NewLocalScheduler() (Scheduler, error) {
 	for _, dev := range c.AllDevices() {
 		if err := ret.addDeviceJob(dev); err != nil {
 			return nil, err
+		}
+	}
+	if Verbose {
+		if text, err := json.MarshalIndent(ret.deviceJobsByTag, "", "  "); err == nil {
+			log.Printf("Full device-job set by tag in scheduler:\n%v\n", string(text))
 		}
 	}
 	return ret, nil
@@ -74,10 +80,10 @@ func (j *schedulerLocal) addDeviceJobToTag(tag string, d *deviceJob) {
 }
 
 type deviceJob struct {
-	*model.Device
-	*model.Job
-	lastRun     time.Time
-	lastRunLock *sync.Mutex
+	*model.Device `json:"device"`
+	*model.Job    `json:"job"`
+	lastRun       time.Time   `json:"-"`
+	lastRunLock   *sync.Mutex `json:"-"`
 }
 
 func (d *deviceJob) nextRun(before time.Time) time.Time {
