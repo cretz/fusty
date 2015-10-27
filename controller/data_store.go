@@ -49,6 +49,8 @@ const (
 	jobKeySplit          = "\x07"
 	GitStructureByDevice = "by_device"
 	GitStructureByJob    = "by_job"
+	GitDirPerm           = 0755
+	GitFilePerm          = 0644
 )
 
 func (d *DataStoreJob) key() string {
@@ -282,7 +284,7 @@ func (g *gitWorker) pushJobs(jobs []*DataStoreJob) {
 
 func (g *gitWorker) initialize() error {
 	// Create the directory if needed
-	if err := os.MkdirAll(g.dir, os.ModePerm); err != nil {
+	if err := os.MkdirAll(g.dir, GitDirPerm); err != nil {
 		return fmt.Errorf("Unable to initialize worker: %v", err)
 	}
 	// TODO: this needs to be cleaned if they change repo info, right? Or can we ask them to delete data dir
@@ -411,10 +413,10 @@ func (g *gitWorker) writeGitFile(path string, contents []byte) error {
 		log.Printf("Writing to file %v", fullPath)
 	}
 	dir, _ := filepath.Split(fullPath)
-	if err := os.MkdirAll(dir, os.FileMode(600)); err != nil {
+	if err := os.MkdirAll(dir, GitDirPerm); err != nil {
 		return err
 	}
-	file, err := os.OpenFile(fullPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, os.FileMode(600))
+	file, err := os.OpenFile(fullPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, GitFilePerm)
 	if err != nil {
 		return err
 	}

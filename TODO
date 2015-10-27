@@ -47,3 +47,4 @@ Future:
 * Offer embedded git server
   * Probably would use https://github.com/gogits/gogs
   * Problem here is that we take ownership of data reliability which is ugly
+* Provide umask option for git files and dirs

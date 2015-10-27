@@ -82,8 +82,8 @@ func (j *schedulerLocal) addDeviceJobToTag(tag string, d *deviceJob) {
 type deviceJob struct {
 	*model.Device `json:"device"`
 	*model.Job    `json:"job"`
-	lastRun       time.Time   `json:"-"`
-	lastRunLock   *sync.Mutex `json:"-"`
+	lastRun       time.Time
+	lastRunLock   *sync.Mutex
 }
 
 func (d *deviceJob) nextRun(before time.Time) time.Time {
