@@ -72,10 +72,10 @@ func (c *CommandSetCommand) ApplyConfig(conf *config.JobCommand) {
 	}
 	// We don't pre-compile the regex because it's sent over the wire
 	for _, re := range conf.Expect {
-		c.Expect = append(c.Expect, c.sanitizeRegex(re))
+		c.Expect = append(c.Expect, sanitizeRegex(re))
 	}
 	for _, re := range conf.ExpectNot {
-		c.ExpectNot = append(c.ExpectNot, c.sanitizeRegex(re))
+		c.ExpectNot = append(c.ExpectNot, sanitizeRegex(re))
 	}
 	if conf.Timeout != nil {
 		c.Timeout = *conf.Timeout
@@ -85,32 +85,27 @@ func (c *CommandSetCommand) ApplyConfig(conf *config.JobCommand) {
 	}
 }
 
-func (c *CommandSetCommand) sanitizeRegex(regex string) string {
-	// We implicitly prepend .* if ^ isn't there and same at end for lack of $
-	// TODO: maybe this should check that the first char isn't a regex char instead?
-	if !strings.HasPrefix(regex, "^") {
-		regex = ".*" + regex
-	}
-	if !strings.HasSuffix(regex, "$") {
-		regex += ".*"
-	}
-	return regex
-}
-
 // Validate after all configs applied
 func (c *CommandSetCommand) Validate() []error {
 	errs := []error{}
 	if c.Command == "" {
 		errs = append(errs, errors.New("Command is empty"))
 	}
+	// We only validate if there aren't replacers here (which means there never
+	// were any or this is after replacement). The reason we do this is because
+	// replacers can completely change the complexion of a regex pattern
 	for _, exp := range c.Expect {
-		if _, err := regexp.Compile(exp); err != nil {
-			errs = append(errs, fmt.Errorf("Invalid regex '%v': %v", exp, err))
+		if !strings.Contains(exp, "{{") {
+			if _, err := regexp.Compile(exp); err != nil {
+				errs = append(errs, fmt.Errorf("Invalid regex '%v': %v", exp, err))
+			}
 		}
 	}
 	for _, exp := range c.ExpectNot {
-		if _, err := regexp.Compile(exp); err != nil {
-			errs = append(errs, fmt.Errorf("Invalid regex '%v': %v", exp, err))
+		if !strings.Contains(exp, "{{") {
+			if _, err := regexp.Compile(exp); err != nil {
+				errs = append(errs, fmt.Errorf("Invalid regex '%v': %v", exp, err))
+			}
 		}
 	}
 	// By rule, the timeout can only be 0 if there aren't any expectations

@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"bytes"
 	. "github.com/smartystreets/goconvey/convey"
 	"gitlab.com/cretz/fusty/config"
 	"io/ioutil"
@@ -42,6 +43,18 @@ func TestSimpleSsh(t *testing.T) {
 					Commands: []*config.JobCommand{
 						&config.JobCommand{Command: "cat /vagrant/sample-config.txt"},
 					},
+					// Let's go ahead and strip the "authenticated" from
+					// "multilink bundle-name authenticated" with a replacer
+					Scrubbers: []*config.JobScrubber{
+						&config.JobScrubber{
+							Type:    "simple",
+							Search:  "multilink bundle-name authenticated",
+							Replace: "multilink bundle-name {{replace_authenticated}}",
+						},
+					},
+					TemplateValues: map[string]string{
+						"replace_authenticated": "job-level",
+					},
 				},
 			}
 
@@ -60,7 +73,12 @@ func TestSimpleSsh(t *testing.T) {
 				"local_linux_vm": &config.Device{
 					Generic: "linux_vm_base",
 					Jobs: map[string]*config.Job{
-						"show_config": &config.Job{},
+						"show_config": &config.Job{
+							// Change the replace_authenticated template value
+							TemplateValues: map[string]string{
+								"replace_authenticated": "device-level",
+							},
+						},
 					},
 				},
 			}
@@ -82,7 +100,9 @@ func TestSimpleSsh(t *testing.T) {
 					file, err := ioutil.ReadFile(filepath.Join(baseDirectory, "integration",
 						"emulated", "sample-config.txt"))
 					So(err, ShouldBeNil)
-
+					// Expect the scrubbing and template value replacement
+					file = bytes.Replace(file, []byte("multilink bundle-name authenticated"),
+						[]byte("multilink bundle-name device-level"), -1)
 					assertion := &gitAssertion{
 						job:          "show_config",
 						device:       "local_linux_vm",
@@ -90,42 +110,8 @@ func TestSimpleSsh(t *testing.T) {
 						fileContents: string(file),
 					}
 					assertion.assertValid(ctx)
-					// Gotta compare regardless of newline style
-					//					assertValidGitCommit(ctx, strings.Replace(strings.TrimSpace(string(file)), "\r\n", "\n", -1))
 				})
 			})
 		})
 	})
 }
-
-//func assertValidGitCommit(ctx *context, fileContentSubstring string) {
-//	gitAssertDir, err := ioutil.TempDir(ctx.tempDirectory, "git-assert-temp")
-//	So(err, ShouldBeNil)
-//	So(os.MkdirAll(gitAssertDir, os.ModePerm), ShouldBeNil)
-//	runInDir(gitAssertDir, "git", "clone", ctx.gitRepoDirectory, gitAssertDir)
-//
-//	authorName := runInDir(gitAssertDir, "git", "log", "-1", "--pretty=%an")
-//	So(authorName, ShouldEqual, "John Doe")
-//	authorEmail := runInDir(gitAssertDir, "git", "log", "-1", "--pretty=%ae")
-//	So(authorEmail, ShouldEqual, "jdoe@example.com")
-//	commitComment := runInDir(gitAssertDir, "git", "log", "-1", "--pretty=%B")
-//	So(commitComment, ShouldContainSubstring, "Job: show_config\n")
-//	So(commitComment, ShouldContainSubstring, "Device: local_linux_vm\n")
-//	// TODO: Some extra validation of the values here?
-//	So(commitComment, ShouldContainSubstring, "Expected Run Date:")
-//	So(commitComment, ShouldContainSubstring, "Start Date:")
-//	So(commitComment, ShouldContainSubstring, "End On:")
-//	So(commitComment, ShouldContainSubstring, "Elapsed Time:")
-//	filesText := runInDir(gitAssertDir, "git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD")
-//	filesUpdated := strings.Split(filesText, "\n")
-//	// TODO: Fix this when checking for other types of git structures
-//	So(len(filesUpdated), ShouldEqual, 1)
-//	So(filesUpdated, ShouldContain, "by_device/local_linux_vm/show_config")
-//
-//	// Now read the the file and make sure it looks right
-//	fileBytes, err := ioutil.ReadFile(filepath.Join(gitAssertDir, "by_device/local_linux_vm/show_config"))
-//	So(err, ShouldBeNil)
-//	// Change /r/n to /n
-//	fileString := strings.Replace(string(fileBytes), "\r\n", "\n", -1)
-//	So(fileString, ShouldContainSubstring, fileContentSubstring)
-//}

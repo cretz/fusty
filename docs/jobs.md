@@ -45,15 +45,30 @@ settings and the defaults are below.
   concatenated in alphabetical order.
   * `FILEPATH` - The file path to fetch.
     * `compression` - If present, this is the compression used by the file. Only `gzip` supported currently.
+* `scrubbers` - Optional array of scrubbers. A scrubber is a string or pattern to remove or replace in the output. They
+  are useful to remove sensitive data such as passwords. Each item in the array may have the following:
+  * `type` - Optional scrubber type of `simple`, `regex`, or `regex_substitute`. The default is `simple`. A `simple`
+    scrubber simply looks for the `search` string and removes or replaces it with `replace`. A `regex` scrubber uses
+    regex for the `search` and removes or replaces it with the exact value in `replace`. A `regex_substitute` scrubber
+    uses regex for the `search` and removes or replaces it with `replace` which can contain regex substitution
+    parameters.
+  * `search` - Required string to search for. If the type is `simple`, this is just normal text. If the type is `regex`
+    or `regex_substitute` this is a regex pattern to match. Like command expectations, if the regular expression doesn't
+    start with a caret (i.e. `^`) then all prefixes are matched (i.e. `.*` is implicitly prepended). Similarly if the
+    regular expression doesn't end with a dollar sign (i.e. `$`) then all suffixes are matched (i.e. `.*` is implicitly
+    appended).
+  * `replace` - Optional replacement string. If the type is `simple` or `regex` this is just normal text. If the type is
+    `regex_substitute`, this is a replacement string which can contain substitution parameters. By default this is an
+    empty string which effectively just removes the text found in `search`.
 * `template_values` - An object with keys as template variable names and values as template values. See below for more
   information.
 
 ## Template Variables
 
-The text for `command`, `expect`, and `expect_not` can use a "template variable". A template variable is a variable that
-can be replaced by something inheriting this configuration. For instance, a job can set the value of a template variable
-that is used in a generic. Similarly a device-job entry can set the value of a template variable used by the job or the
-job generic.
+The text for `commands.command`, `commands.expect`, `commands.expect_not`, `scrubbers.search`, `scrubbers.replace` can
+use "template variables". A template variable is a variable that can be replaced by something inheriting this
+configuration. For instance, a job can set the value of a template variable that is used in a generic. Similarly a
+device-job entry can set the value of a template variable used by the job or the job generic.
 
 Template variables are words that are surrounded by two curly braces. Therefore a command that is `foo {{bar}}` can have
 a template variable named `bar` that will be replaced in the text for each device the job runs. So if the `bar`

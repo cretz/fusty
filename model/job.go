@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"gitlab.com/cretz/fusty/config"
+	"regexp"
 	"strings"
 )
 
@@ -12,6 +13,7 @@ type Job struct {
 	*CommandSet    `json:"command_set"`
 	*FileSet       `json:"file_set"`
 	Schedule       `json:"-"`
+	Scrubbers      []*JobScrubber    `json:"scrubbers"`
 	TemplateValues map[string]string `json:"template_values"`
 }
 
@@ -50,26 +52,15 @@ func (j *Job) ApplyConfig(conf *config.Job) error {
 	if j.FileSet != nil {
 		j.FileSet.ApplyConfig(conf)
 	}
-	//	switch conf.Type {
-	//	case "", "command":
-	//		if j.CommandSet == nil {
-	//			j.CommandSet = NewDefaultCommandSet()
-	//		}
-	//		j.CommandSet.ApplyConfig(conf)
-	//	case "file":
-	//		if j.FileSet == nil {
-	//			j.FileSet = NewDefaultFileSet()
-	//		}
-	//		j.FileSet.ApplyConfig(conf)
-	//	default:
-	//		return fmt.Errorf("Unrecognized job type %v", conf.Type)
-	//	}
 	if conf.JobSchedule != nil {
 		if sched, err := NewScheduleFromConfig(conf.JobSchedule); err != nil {
 			return fmt.Errorf("Invalid schedule: %v", err)
 		} else {
 			j.Schedule = sched
 		}
+	}
+	for _, scrubber := range conf.Scrubbers {
+		j.Scrubbers = append(j.Scrubbers, NewJobScrubberFromConfig(scrubber))
 	}
 	for key, value := range conf.TemplateValues {
 		j.TemplateValues[key] = value
@@ -78,8 +69,8 @@ func (j *Job) ApplyConfig(conf *config.Job) error {
 }
 
 func (j *Job) ApplyTemplateValues() {
-	if j.CommandSet != nil {
-		for key, value := range j.TemplateValues {
+	for key, value := range j.TemplateValues {
+		if j.CommandSet != nil {
 			for _, cmd := range j.CommandSet.Commands {
 				cmd.Command = strings.Replace(cmd.Command, "{{"+key+"}}", value, -1)
 				for index, expect := range cmd.Expect {
@@ -89,6 +80,10 @@ func (j *Job) ApplyTemplateValues() {
 					cmd.ExpectNot[index] = strings.Replace(expect, "{{"+key+"}}", value, -1)
 				}
 			}
+		}
+		for _, scrubber := range j.Scrubbers {
+			scrubber.Search = strings.Replace(scrubber.Search, "{{"+key+"}}", value, -1)
+			scrubber.Replace = strings.Replace(scrubber.Replace, "{{"+key+"}}", value, -1)
 		}
 	}
 }
@@ -108,6 +103,9 @@ func (j *Job) DeepCopy() *Job {
 	if j.FileSet != nil {
 		job.FileSet = j.FileSet.DeepCopy()
 	}
+	for _, scrubber := range j.Scrubbers {
+		job.Scrubbers = append(job.Scrubbers, scrubber.DeepCopy())
+	}
 	for key, value := range j.TemplateValues {
 		job.TemplateValues[key] = value
 	}
@@ -125,5 +123,59 @@ func (j *Job) Validate() []error {
 	if j.FileSet != nil {
 		errs = append(errs, j.FileSet.Validate()...)
 	}
+	for _, scrubber := range j.Scrubbers {
+		if err := scrubber.Validate(); err != nil {
+			errs = append(errs, fmt.Errorf("Scrubbe validation failed: %v", err))
+		}
+	}
 	return errs
+}
+
+type JobScrubber struct {
+	Type    string `json:"type"`
+	Search  string `json:"search"`
+	Replace string `json:"replace"`
+}
+
+func NewJobScrubberFromConfig(conf *config.JobScrubber) *JobScrubber {
+	// We don't need to eagerly check the type, we'll check in Validate
+	typ := conf.Type
+	if typ == "" {
+		typ = "simple"
+	}
+	search := conf.Search
+	if typ == "regex" || typ == "regex_substitute" {
+		search = sanitizeRegex(search)
+	}
+	return &JobScrubber{
+		Type:    typ,
+		Search:  search,
+		Replace: conf.Replace,
+	}
+}
+
+func (j *JobScrubber) DeepCopy() *JobScrubber {
+	return &JobScrubber{
+		Type:    j.Type,
+		Search:  j.Search,
+		Replace: j.Replace,
+	}
+}
+
+func (j *JobScrubber) Validate() error {
+	if j.Search == "" {
+		return errors.New("No search given")
+	}
+	if j.Type == "regex" || j.Type == "regex_substitute" {
+		// We only validate when there are no replacers because replacers
+		// can completely change regex semantics
+		if !strings.Contains(j.Search, "{{") {
+			if _, err := regexp.Compile(j.Search); err != nil {
+				return fmt.Errorf("Invalid regex '%v': %v", j.Search, err)
+			}
+		}
+	} else if j.Type != "simple" {
+		return fmt.Errorf("Unrecognized scrubber type: %v", j.Type)
+	}
+	return nil
 }

@@ -51,6 +51,21 @@ func runExecution(execution *model.Execution) *result {
 		return res
 	}
 	res.file, res.failure = runJob(sess, execution.Job)
+
+	// We scrub no matter what but if there is failure we don't override failure.
+	// Note, if there is anything to scrub we completely remove what exists on
+	// failure because we don't want to send over unscrubbed info
+	if len(res.file) > 0 && len(execution.Job.Scrubbers) > 0 {
+		if clean, err := scrubBytes(res.file, execution.Job); err != nil {
+			if res.failure == nil {
+				res.failure = err
+			}
+			res.file = []byte{}
+		} else {
+			res.file = clean
+		}
+	}
+
 	res.endTimestamp = time.Now().Unix()
 	return res
 }
@@ -212,4 +227,26 @@ func fetchFile(sess session, job *model.Job) ([]byte, error) {
 		log.Printf("Overall fetched:\n%v", string(buf.Bytes()))
 	}
 	return buf.Bytes(), nil
+}
+
+func scrubBytes(dirty []byte, job *model.Job) ([]byte, error) {
+	clean := dirty
+	for _, scrubber := range job.Scrubbers {
+		if Verbose {
+			log.Printf("Scrubber type %v replacing '%v' with '%v'", scrubber.Type, scrubber.Search, scrubber.Replace)
+		}
+		if scrubber.Type == "regex" || scrubber.Type == "regex_substitute" {
+			// Meh not that harmful to recompile here everytime
+			if exp, err := regexp.Compile(scrubber.Search); err != nil {
+				return nil, fmt.Errorf("Unable to compile scrubber search '%v': %v", scrubber.Search, err)
+			} else if scrubber.Type == "regex" {
+				clean = exp.ReplaceAllLiteral(clean, []byte(scrubber.Replace))
+			} else {
+				clean = exp.ReplaceAll(clean, []byte(scrubber.Replace))
+			}
+		} else {
+			clean = bytes.Replace(clean, []byte(scrubber.Search), []byte(scrubber.Replace), -1)
+		}
+	}
+	return clean, nil
 }

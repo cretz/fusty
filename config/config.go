@@ -88,6 +88,7 @@ type Job struct {
 	Commands       []*JobCommand       `json:"commands,omitempty"`
 	CommandGeneric *JobCommand         `json:"command_generic,omitempty"`
 	JobFile        map[string]*JobFile `json:"file,omitempty"`
+	Scrubbers      []*JobScrubber      `json:"scrubbers,omitempty"`
 	TemplateValues map[string]string   `json:"template_values,omitempty"`
 }
 
@@ -108,6 +109,12 @@ type JobCommand struct {
 
 type JobFile struct {
 	Compression string `json:"compression,omitempty"`
+}
+
+type JobScrubber struct {
+	Type    string `json:"type,omitempty"`
+	Search  string `json:"search,omitempty"`
+	Replace string `json:"replace,omitempty"`
 }
 
 type DeviceStore struct {

@@ -382,7 +382,8 @@ func (g *gitAssertion) assertValid(ctx *context) {
 	// Now read the the file and make sure it looks right
 	fileBytes, err := ioutil.ReadFile(filepath.Join(gitAssertDir, g.filesUpdated[0]))
 	So(err, ShouldBeNil)
+	expected := strings.Replace(strings.TrimSpace(g.fileContents), "\r\n", "\n", -1)
+	actual := strings.Replace(strings.TrimSpace(string(fileBytes)), "\r\n", "\n", -1)
 	// Change /r/n to /n
-	So(strings.Replace(string(fileBytes), "\r\n", "\n", -1),
-		ShouldContainSubstring, strings.Replace(strings.TrimSpace(string(fileBytes)), "\r\n", "\n", -1))
+	So(actual, ShouldContainSubstring, expected)
 }
