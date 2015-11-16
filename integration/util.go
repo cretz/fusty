@@ -166,7 +166,7 @@ func (ctx *context) writeConfigFile(conf *config.Config) (f *os.File, err error)
 	f, err = ioutil.TempFile(ctx.tempDirectory, "fusty-config")
 	if err == nil {
 		defer f.Close()
-		if bytes, e := conf.ToBytes(); e != nil {
+		if bytes, e := conf.ToJSON(false); e != nil {
 			err = e
 		} else {
 			_, err = f.Write(bytes)
@@ -290,7 +290,7 @@ func (ctx *context) startControllerInBackground(c C, conf *config.Config) *fusty
 	})
 	confFile, err := ctx.writeConfigFile(conf)
 	c.So(err, ShouldBeNil)
-	bytes, err := conf.ToBytesPretty()
+	bytes, err := conf.ToJSON(true)
 	c.So(err, ShouldBeNil)
 	log.Printf("Running controller with config and waiting 3 seconds to start: %v", string(bytes))
 	args := []string{"controller", "-config", confFile.Name()}

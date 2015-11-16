@@ -1,15 +1,14 @@
 # Configuration
 
-Fusty is configured via configuration files. The configuration can currently only be written in JSON. In the future
-[YAML](http://yaml.org/), [TOML](https://github.com/toml-lang/toml), [HCL](https://github.com/hashicorp/hcl), and
-JSON with comments may be supported. The recommended approach to configuring Fusty is to use the web application that
-starts with the controller.
+Fusty is configured via configuration files. The configuration can be written in JSON, [YAML](http://yaml.org/), or
+[TOML](https://github.com/toml-lang/toml) (v0.2.0). In the future, [HCL](https://github.com/hashicorp/hcl). The format
+of configuration is determined by the file extension. 
 
-By default the configuration file is assumed to be `fusty.conf.json` in the current working directory, but this can be
-configured to point to any path. Each section below represents one section of configuration, but they are all together
-in the single configuration file. Although the examples in the sections below use JSON with comments, the actual
-implementation does not currently support comments in JSON files. Some sections are commented out because they are
-optional.
+By default the configuration file is assumed to be `fusty.conf.json` (or `fusty.conf.yaml` or `fusty.conf.toml`) in the
+current working directory, but this can be configured to point to any path. Each section below represents one section of
+configuration, but they are all together in the single configuration file. Although the examples in the sections below
+use JSON with comments, the actual implementation does not currently support comments in JSON files. Some sections are
+commented out because they are optional.
 
 ## General Settings
 

@@ -31,6 +31,10 @@ func RunController(configFilename string) error {
 	if configFilename == "" {
 		if _, err := os.Stat("./fusty.conf.json"); err == nil {
 			configFilename = "./fusty.conf.json"
+		} else if _, err := os.Stat("./fusty.conf.yaml"); err == nil {
+			configFilename = "./fusty.conf.yaml"
+		} else if _, err := os.Stat("./fusty.conf.toml"); err == nil {
+			configFilename = "./fusty.conf.toml"
 		}
 	}
 	if configFilename != "" {
