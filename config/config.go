@@ -13,7 +13,8 @@ type Config struct {
 }
 
 type Tls struct {
-	Enabled bool `json:"enabled,omitempty" toml:"enabled" yaml:"enabled,omitempty" hcl:"enabled"`
+	CertFile string `json:"cert_file,omitempty" toml:"cert_file" yaml:"cert_file,omitempty" hcl:"cert_file"`
+	KeyFile  string `json:"key_file,omitempty" toml:"key_file" yaml:"key_file,omitempty" hcl:"key_file"`
 }
 
 type DataStore struct {

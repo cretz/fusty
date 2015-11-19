@@ -36,8 +36,9 @@ func (d *Device) ApplyConfig(conf *config.Device) error {
 				port = conf.DeviceProtocol.DeviceProtocolSsh.Port
 			}
 			d.DeviceProtocol.SshDeviceProtocol = &SshDeviceProtocol{
-				Port:              port,
-				IncludeCbcCiphers: conf.DeviceProtocol.DeviceProtocolSsh.IncludeCbcCiphers,
+				Port: port,
+				IncludeCbcCiphers: conf.DeviceProtocol.DeviceProtocolSsh != nil &&
+					conf.DeviceProtocol.DeviceProtocolSsh.IncludeCbcCiphers,
 			}
 		default:
 			return fmt.Errorf("Unrecognized protocol type: %v", conf.Type)

@@ -125,7 +125,7 @@ func (j *Job) Validate() []error {
 	}
 	for _, scrubber := range j.Scrubbers {
 		if err := scrubber.Validate(); err != nil {
-			errs = append(errs, fmt.Errorf("Scrubbe validation failed: %v", err))
+			errs = append(errs, fmt.Errorf("Scrubber validation failed: %v", err))
 		}
 	}
 	return errs

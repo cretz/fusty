@@ -8,4 +8,6 @@ type Config struct {
 	MaxJobs        int
 	TimeoutSeconds int
 	Syslog         bool
+	SkipVerify     bool
+	CAFile         string
 }

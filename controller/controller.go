@@ -125,7 +125,15 @@ func (c *Controller) Start() error {
 		Addr:    ip + ":" + strconv.Itoa(port),
 		Handler: mux,
 	}
-	// TODO: TLS support
-	c.outLog.Printf("Starting controller on %v", server.Addr)
+	if c.conf.Tls != nil {
+		if (c.conf.Tls.CertFile == "") != (c.conf.Tls.KeyFile == "") {
+			return errors.New("If cert file is present key file must be and vice versa")
+		}
+		if c.conf.Tls.CertFile != "" {
+			c.outLog.Printf("Starting HTTPS controller on %v", server.Addr)
+			return server.ListenAndServeTLS(c.conf.Tls.CertFile, c.conf.Tls.KeyFile)
+		}
+	}
+	c.outLog.Printf("Starting HTTP controller on %v", server.Addr)
 	return server.ListenAndServe()
 }

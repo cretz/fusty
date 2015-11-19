@@ -2,6 +2,8 @@ package worker
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -44,16 +46,6 @@ func RunWorker(conf *Config) error {
 	}
 	conf.ControllerUrl = strings.TrimRight(conf.ControllerUrl, "/")
 
-	// We need to ping the controller to make sure it's good
-	if Verbose {
-		log.Printf("Pinging worker at %v/worker/ping", conf.ControllerUrl)
-	}
-	if resp, err := http.Get(conf.ControllerUrl + "/worker/ping"); err != nil {
-		return fmt.Errorf("Unable to contact controller at %v/worker/ping: %v", conf.ControllerUrl, err)
-	} else if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Bad status from %v/worker/ping: %v", conf.ControllerUrl, resp.StatusCode)
-	}
-
 	// Create the worker and go
 	work, err := NewWorker(conf)
 	if err != nil {
@@ -92,6 +84,35 @@ func NewWorker(conf *Config) (*Worker, error) {
 		CheckRedirect: func(req *http.Request, via []*http.Request) error { return errors.New("Redirects disabled") },
 		Timeout:       time.Duration(conf.TimeoutSeconds) * time.Second,
 	}
+	if conf.SkipVerify {
+		if conf.CAFile != "" {
+			return nil, errors.New("Cannot have both noverify and cafile")
+		}
+		worker.controllerClient.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+	} else if conf.CAFile != "" {
+		pool := x509.NewCertPool()
+		if caData, err := ioutil.ReadFile(conf.CAFile); err != nil {
+			return nil, fmt.Errorf("Unable to read CA file: %v", err)
+		} else if !pool.AppendCertsFromPEM(caData) {
+			return nil, errors.New("Unable to add CA")
+		}
+		worker.controllerClient.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{RootCAs: pool},
+		}
+	}
+
+	// We need to ping the controller to make sure it's good
+	if Verbose {
+		log.Printf("Pinging worker at %v/worker/ping", conf.ControllerUrl)
+	}
+	if resp, err := worker.controllerClient.Get(conf.ControllerUrl + "/worker/ping"); err != nil {
+		return nil, fmt.Errorf("Unable to contact controller at %v/worker/ping: %v", conf.ControllerUrl, err)
+	} else if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Bad status from %v/worker/ping: %v", conf.ControllerUrl, resp.StatusCode)
+	}
+
 	return worker, nil
 }
 

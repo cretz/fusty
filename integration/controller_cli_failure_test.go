@@ -6,7 +6,6 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"gitlab.com/cretz/fusty/config"
 	"io/ioutil"
-	"log"
 	"path/filepath"
 	"testing"
 )
@@ -25,13 +24,14 @@ func TestControllerFailures(t *testing.T) {
 		})
 
 		Convey("When we make a valid custom config", func() {
-			conf := newWorkingConfig()
+			ctx := newContext()
+			conf := ctx.newWorkingConfig()
 
 			Convey("When we are concerned with the job store configuration", func() {
 
 				Convey("When we have no job store", func() {
 					conf.JobStore = nil
-					withTempConfig(c, conf, func(confFile string) {
+					ctx.withTempConfig(c, conf, func(confFile string) {
 						cmd := runFusty(c, "controller", "-config", confFile)
 						cmd.conveyCommandFailure("Job store configuration not found")
 					})
@@ -39,7 +39,7 @@ func TestControllerFailures(t *testing.T) {
 
 				Convey("When we change the job store type to invalid", func() {
 					conf.JobStore.Type = "unknown"
-					withTempConfig(c, conf, func(confFile string) {
+					ctx.withTempConfig(c, conf, func(confFile string) {
 						cmd := runFusty(c, "controller", "-config", confFile)
 						cmd.conveyCommandFailure("Unrecognized job store type: unknown")
 					})
@@ -47,7 +47,7 @@ func TestControllerFailures(t *testing.T) {
 
 				Convey("When we have an invalid generic", func() {
 					conf.JobStore.JobStoreLocal.Jobs["bar"].Generic = "not-here"
-					withTempConfig(c, conf, func(confFile string) {
+					ctx.withTempConfig(c, conf, func(confFile string) {
 						cmd := runFusty(c, "controller", "-config", confFile)
 						cmd.conveyCommandFailure("Unable to find job generic named: not-here")
 					})
@@ -55,7 +55,7 @@ func TestControllerFailures(t *testing.T) {
 
 				Convey("When we have an invalid generic schedule", func() {
 					conf.JobStore.JobStoreLocal.JobGenerics["foo"].JobSchedule.Cron = "blah"
-					withTempConfig(c, conf, func(confFile string) {
+					ctx.withTempConfig(c, conf, func(confFile string) {
 						cmd := runFusty(c, "controller", "-config", confFile)
 						cmd.conveyCommandFailure("Invalid schedule: missing field(s)")
 					})
@@ -63,17 +63,9 @@ func TestControllerFailures(t *testing.T) {
 
 				Convey("When we have an invalid schedule", func() {
 					conf.JobStore.JobStoreLocal.Jobs["bar"].JobSchedule = &config.JobSchedule{Cron: "0 30 * * * *"}
-					withTempConfig(c, conf, func(confFile string) {
+					ctx.withTempConfig(c, conf, func(confFile string) {
 						cmd := runFusty(c, "controller", "-config", confFile)
 						cmd.conveyCommandFailure("Invalid schedule: syntax error in hour field: '30'")
-					})
-				})
-
-				Convey("When we have an empty command set", func() {
-					conf.JobStore.JobStoreLocal.Jobs["bar"].JobCommand = &config.JobCommand{Inline: []string{}}
-					withTempConfig(c, conf, func(confFile string) {
-						cmd := runFusty(c, "controller", "-config", confFile)
-						cmd.conveyCommandFailure("Invalid command set: No commands in set")
 					})
 				})
 			})
@@ -85,7 +77,7 @@ func TestControllerFailures(t *testing.T) {
 
 				Convey("When we have no device store", func() {
 					conf.DeviceStore = nil
-					withTempConfig(c, conf, func(confFile string) {
+					ctx.withTempConfig(c, conf, func(confFile string) {
 						cmd := runFusty(c, "controller", "-config", confFile)
 						cmd.conveyCommandFailure("Device store configuration not found")
 					})
@@ -93,7 +85,7 @@ func TestControllerFailures(t *testing.T) {
 
 				Convey("When we change the device store type to invalid", func() {
 					conf.DeviceStore.Type = "unknown"
-					withTempConfig(c, conf, func(confFile string) {
+					ctx.withTempConfig(c, conf, func(confFile string) {
 						cmd := runFusty(c, "controller", "-config", confFile)
 						cmd.conveyCommandFailure("Unrecognized device store type: unknown")
 					})
@@ -101,7 +93,7 @@ func TestControllerFailures(t *testing.T) {
 
 				Convey("When we have an invalid generic", func() {
 					conf.DeviceStore.DeviceStoreLocal.Devices["qux"].Generic = "not-here"
-					withTempConfig(c, conf, func(confFile string) {
+					ctx.withTempConfig(c, conf, func(confFile string) {
 						cmd := runFusty(c, "controller", "-config", confFile)
 						cmd.conveyCommandFailure("Unable to find device generic named: not-here")
 					})
@@ -109,7 +101,7 @@ func TestControllerFailures(t *testing.T) {
 
 				Convey("When we have an invalid protocol type", func() {
 					conf.DeviceStore.DeviceStoreLocal.Devices["qux"].DeviceProtocol.Type = "unknown"
-					withTempConfig(c, conf, func(confFile string) {
+					ctx.withTempConfig(c, conf, func(confFile string) {
 						cmd := runFusty(c, "controller", "-config", confFile)
 						cmd.conveyCommandFailure("Unrecognized protocol type: unknown")
 					})
@@ -120,7 +112,7 @@ func TestControllerFailures(t *testing.T) {
 
 				Convey("When we have no data store", func() {
 					conf.DataStore = nil
-					withTempConfig(c, conf, func(confFile string) {
+					ctx.withTempConfig(c, conf, func(confFile string) {
 						cmd := runFusty(c, "controller", "-config", confFile)
 						cmd.conveyCommandFailure("Data store configuration not found")
 					})
@@ -128,7 +120,7 @@ func TestControllerFailures(t *testing.T) {
 
 				Convey("When we change the data store type to invalid", func() {
 					conf.DataStore.Type = "unknown"
-					withTempConfig(c, conf, func(confFile string) {
+					ctx.withTempConfig(c, conf, func(confFile string) {
 						cmd := runFusty(c, "controller", "-config", confFile)
 						cmd.conveyCommandFailure("Unrecognized data store type: unknown")
 					})
@@ -136,7 +128,7 @@ func TestControllerFailures(t *testing.T) {
 
 				Convey("When there is no git URL", func() {
 					conf.DataStore.DataStoreGit.Url = ""
-					withTempConfig(c, conf, func(confFile string) {
+					ctx.withTempConfig(c, conf, func(confFile string) {
 						cmd := runFusty(c, "controller", "-config", confFile)
 						cmd.conveyCommandFailure("Data store for git requires url")
 					})
@@ -144,15 +136,15 @@ func TestControllerFailures(t *testing.T) {
 
 				Convey("When we use an unknown structure", func() {
 					conf.DataStore.DataStoreGit.Structure = []string{"unknown"}
-					withTempConfig(c, conf, func(confFile string) {
+					ctx.withTempConfig(c, conf, func(confFile string) {
 						cmd := runFusty(c, "controller", "-config", confFile)
 						cmd.conveyCommandFailure("Unrecognized git structure: unknown")
 					})
 				})
 
 				Convey("When we use an invalid data directory", func() {
-					conf.DataStore.DataStoreGit.DataDir = filepath.Join(tempDirectory, "notpresent")
-					withTempConfig(c, conf, func(confFile string) {
+					conf.DataStore.DataStoreGit.DataDir = filepath.Join(ctx.tempDirectory, "notpresent")
+					ctx.withTempConfig(c, conf, func(confFile string) {
 						cmd := runFusty(c, "controller", "-config", confFile)
 						cmd.conveyCommandFailure("Failure obtaining git data directory")
 					})
@@ -160,7 +152,7 @@ func TestControllerFailures(t *testing.T) {
 
 				Convey("When we use an invalid email", func() {
 					conf.DataStore.DataStoreGit.DataStoreGitUser.Email = "invalidemail"
-					withTempConfig(c, conf, func(confFile string) {
+					ctx.withTempConfig(c, conf, func(confFile string) {
 						cmd := runFusty(c, "controller", "-config", confFile)
 						cmd.conveyCommandFailure("Invalid email for git user")
 					})
@@ -168,32 +160,22 @@ func TestControllerFailures(t *testing.T) {
 
 				Convey("When we use a password without user", func() {
 					conf.DataStore.DataStoreGit.DataStoreGitUser.Pass = "somepass"
-					withTempConfig(c, conf, func(confFile string) {
+					ctx.withTempConfig(c, conf, func(confFile string) {
 						cmd := runFusty(c, "controller", "-config", confFile)
 						cmd.conveyCommandFailure("If git password supplied, username must also be supplied")
 					})
 				})
 
 				Convey("When we use a git repository that doesn't exist", func() {
-					dir, err := ioutil.TempDir(tempDirectory, "badgit")
+					dir, err := ioutil.TempDir(ctx.tempDirectory, "badgit")
 					So(err, ShouldBeNil)
 					conf.DataStore.DataStoreGit.Url = dir
-					withTempConfig(c, conf, func(confFile string) {
+					ctx.withTempConfig(c, conf, func(confFile string) {
 						cmd := runFusty(c, "controller", "-config", confFile)
 						cmd.conveyCommandFailure("Git repository validation using ls-remote failed")
 					})
 				})
 			})
 		})
-	})
-}
-
-func (c *fustyCmd) conveyCommandFailure(expectedString string) {
-	Convey("Then the command should fail with '"+expectedString+"'", func() {
-		out, _ := c.CombinedOutput()
-		So(c.Success(), ShouldBeFalse)
-		So(out, ShouldNotBeEmpty)
-		log.Printf("Fusty out: %v", string(out))
-		So(string(out), ShouldContainSubstring, expectedString)
 	})
 }

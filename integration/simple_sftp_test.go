@@ -62,7 +62,7 @@ func TestSimpleSftp(t *testing.T) {
 
 			Convey("And the controller and worker are started for 10 seconds to perform the backup", func(c C) {
 				// Fire up the controller and worker
-				controller := ctx.startControllerInBackground(c, conf)
+				controller := ctx.startControllerInBackground(c, conf, true)
 				worker := ctx.startWorkerInBackground(c)
 
 				log.Print("Waiting 10 seconds and then shutting down controller and worker")

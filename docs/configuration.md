@@ -16,22 +16,25 @@ Below is a JSON configuration for general top-level settings for Fusty. Comments
 
 ```js
 // The IP to listen on. Default is all IPs
-// "ip": "0.0.0.0"
+// "ip": "0.0.0.0",
 
 // The port to listen on. Default is 9400
-// "port": 9400
+// "port": 9400,
 
 // The log level. Default is info
-// "log_level": "info"
+// "log_level": "info",
 
 // Set true to log to syslog in addition to stdout. Fails on Windows. Default is false
-// "syslog": false
+// "syslog": false,
 
-// TLS settings for the web application
+// Optional TLS settings for the HTTP port. The cert and key must be present to listen over TLS.
 "tls": {
 
-  // Set false to use HTTP instead. Default is true
-  // "enabled": true
+  // The path to the public key. This is required if key_file is present
+  // "cert_file": "path/to/cert.pem",
+  
+  // The path to the private key. This is required if cert_file is present
+  // "key_file": "path/to/cert.pem"
 }
 ```
 

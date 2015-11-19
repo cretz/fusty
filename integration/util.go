@@ -1,8 +1,10 @@
 package integration
 
 import (
+	"bytes"
 	. "github.com/smartystreets/goconvey/convey"
 	"gitlab.com/cretz/fusty/config"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -155,24 +157,32 @@ func tearDown() {
 
 func (ctx *context) withTempConfig(c C, conf *config.Config, f func(string)) {
 	confFile, err := ctx.writeConfigFile(conf)
-	if confFile != nil {
-		defer os.Remove(confFile.Name())
+	if err != nil {
+		defer os.Remove(confFile)
 	}
 	c.So(err, ShouldBeNil)
-	f(confFile.Name())
+	f(confFile)
 }
 
-func (ctx *context) writeConfigFile(conf *config.Config) (f *os.File, err error) {
-	f, err = ioutil.TempFile(ctx.tempDirectory, "fusty-config")
+func (ctx *context) writeConfigFile(conf *config.Config) (string, error) {
+	f, err := ioutil.TempFile(ctx.tempDirectory, "fusty-config")
+	filename := ""
 	if err == nil {
-		defer f.Close()
-		if bytes, e := conf.ToJSON(false); e != nil {
-			err = e
-		} else {
-			_, err = f.Write(bytes)
+		func() {
+			defer f.Close()
+			if bytes, e := conf.ToJSON(false); e != nil {
+				err = e
+			} else {
+				_, err = f.Write(bytes)
+			}
+		}()
+		if err == nil {
+			// Move the file so it can have .json extension
+			filename = f.Name() + ".json"
+			err = os.Rename(f.Name(), filename)
 		}
 	}
-	return
+	return filename, err
 }
 
 type fustyCmd struct {
@@ -180,8 +190,9 @@ type fustyCmd struct {
 }
 
 type fustyCmdAbstraction interface {
-	RunAndStreamToOutput(prefix string) error
+	RunAndStreamOutput(prefix string) error
 	CombinedOutput() ([]byte, error)
+	StreamedOutput() []byte
 	Exited() bool
 	Success() bool
 	Stop() error
@@ -197,10 +208,21 @@ func runFusty(c C, args ...string) *fustyCmd {
 	}
 }
 
+func (c *fustyCmd) conveyCommandFailure(expectedString string) {
+	Convey("Then the command should fail with '"+expectedString+"'", func() {
+		out, _ := c.CombinedOutput()
+		So(c.Success(), ShouldBeFalse)
+		So(out, ShouldNotBeEmpty)
+		log.Printf("Fusty out: %v", string(out))
+		So(string(out), ShouldContainSubstring, expectedString)
+	})
+}
+
 type fustyCmdExternal struct {
 	c C
 	*exec.Cmd
-	lock *sync.Mutex
+	lock           *sync.Mutex
+	streamedOutput *bytes.Buffer
 }
 
 func createExternalCmd(c C, cmd *exec.Cmd) *fustyCmdExternal {
@@ -211,8 +233,9 @@ func createExternalCmd(c C, cmd *exec.Cmd) *fustyCmdExternal {
 	}
 }
 
-func (f *fustyCmdExternal) RunAndStreamToOutput(prefix string) error {
-	out := &stdoutWriter{prefix: prefix}
+func (f *fustyCmdExternal) RunAndStreamOutput(prefix string) error {
+	f.streamedOutput = &bytes.Buffer{}
+	out := io.MultiWriter(&stdoutWriter{prefix: prefix}, f.streamedOutput)
 	f.Cmd.Stdout = out
 	f.Cmd.Stderr = out
 	return f.Cmd.Run()
@@ -222,6 +245,12 @@ func (f *fustyCmdExternal) CombinedOutput() ([]byte, error) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	return f.Cmd.CombinedOutput()
+}
+
+func (f *fustyCmdExternal) StreamedOutput() []byte {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	return f.streamedOutput.Bytes()
 }
 
 func (f *fustyCmdExternal) Exited() bool {
@@ -280,7 +309,7 @@ func (s *stdoutWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func (ctx *context) startControllerInBackground(c C, conf *config.Config) *fustyCmd {
+func (ctx *context) startControllerInBackground(c C, conf *config.Config, verifyUp bool) *fustyCmd {
 	log.Print("Starting controller")
 	var controllerCmd *fustyCmd
 	Reset(func() {
@@ -293,12 +322,15 @@ func (ctx *context) startControllerInBackground(c C, conf *config.Config) *fusty
 	bytes, err := conf.ToJSON(true)
 	c.So(err, ShouldBeNil)
 	log.Printf("Running controller with config and waiting 3 seconds to start: %v", string(bytes))
-	args := []string{"controller", "-config", confFile.Name()}
+	args := []string{"controller", "-config", confFile}
 	if ctx.verbose {
 		args = append(args, "-verbose")
 	}
 	controllerCmd = runFusty(c, args...)
-	go controllerCmd.RunAndStreamToOutput("Controller out: ")
+	go controllerCmd.RunAndStreamOutput("Controller out: ")
+	if !verifyUp {
+		return controllerCmd
+	}
 	// Try once a second for 10 seconds to see if up
 	url := "http://" + conf.Ip + ":" + strconv.Itoa(conf.Port) + "/worker/ping"
 	success := false
@@ -319,15 +351,7 @@ func (ctx *context) startControllerInBackground(c C, conf *config.Config) *fusty
 }
 
 func (ctx *context) startWorkerInBackground(c C) *fustyCmd {
-	log.Print("Starting worker")
-	var workerCmd *fustyCmd
-	Reset(func() {
-		if workerCmd != nil && !workerCmd.Exited() {
-			workerCmd.Stop()
-		}
-	})
 	args := []string{
-		"worker",
 		"-controller",
 		"http://127.0.0.1:9400",
 		// We'll sleep for 20 minutes, because basically the worker will fetch work right from
@@ -338,11 +362,23 @@ func (ctx *context) startWorkerInBackground(c C) *fustyCmd {
 		"-maxjobs",
 		"1",
 	}
+	return ctx.startWorkerInBackgroundWithArgs(c, args...)
+}
+
+func (ctx *context) startWorkerInBackgroundWithArgs(c C, args ...string) *fustyCmd {
+	log.Print("Starting worker")
+	var workerCmd *fustyCmd
+	Reset(func() {
+		if workerCmd != nil && !workerCmd.Exited() {
+			workerCmd.Stop()
+		}
+	})
+	args = append([]string{"worker"}, args...)
 	if ctx.verbose {
 		args = append(args, "-verbose")
 	}
 	workerCmd = runFusty(c, args...)
-	go workerCmd.RunAndStreamToOutput("Worker out: ")
+	go workerCmd.RunAndStreamOutput("Worker out: ")
 	return workerCmd
 }
 

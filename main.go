@@ -58,6 +58,8 @@ func runWorker(args ...string) error {
 	flags.IntVar(&conf.SleepSeconds, "sleep", 15, "Sleep seconds")
 	flags.IntVar(&conf.MaxJobs, "maxjobs", 2000, "Max running jobs")
 	flags.IntVar(&conf.TimeoutSeconds, "timeout", 3, "Controller HTTP timeout seconds")
+	flags.StringVar(&conf.CAFile, "cafile", "", "CA certificate to verify controller TLS with")
+	flags.BoolVar(&conf.SkipVerify, "noverify", false, "Skip TLS certificate verification")
 	verbose := flags.Bool("verbose", false, "Verbose")
 	if err := flags.Parse(args); err != nil {
 		return fmt.Errorf("Error parsing arguments: %v", err)

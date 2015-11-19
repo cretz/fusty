@@ -26,17 +26,21 @@ syslog.
 
 ## Running a Worker
 
-    fusty worker [-controller=http://127.0.0.1:9400] [-tag=tag1] [-tag=tag2] [-sleep=15] [-maxjobs=N] [-verbose]
+    fusty worker [-controller=http://127.0.0.1:9400] [-tag=tag1] [-tag=tag2] [-sleep=15] [-maxjobs=N] [-cafile=FILE] [-noverify] [-verbose]
 
 A worker doesn't have a configuration file but it does have optional settings:
 
-* `-controller` - This is the base URL for the controller. If not provided, it assumes `http://127.0.0.1:9400`.
+* `-controller` - This is the base URL for the controller. If not provided, it assumes `http://127.0.0.1:9400`. If TLS
+  settings are present on the controller, use https.
 * `-tag` - This is the device tag that this worker accepts work for. This can be provided multiple times for multiple
   tags. If not provided, this worker accepts work for all device types.
 * `-sleep` - The number of seconds to wait to ask the controller for more work if none was given last request. The
   higher this number is, the more "off" a job run may be. By default this is 15 seconds.
 * `-maxjobs` - The maximum number of jobs this worker can be executing at any one time. By default this is 2000.
 * `-timeout` - The maximum number of seconds to wait for the controller to respond to HTTP. By default this is 3.
+* `-cafile` - The PEM-encoded CA file for TLS verification. This is mutually exclusive with `-noverify`.
+* `-noverify` - If set, the controller TLS certificate chain is not verified if using TLS. This is mutually exclusive
+  with `-cafile`.
 * `-verbose` - If set, the log output will be verbose. Note, these extra-verbose messages currently do not go to syslog.
 
 In the future, there will also be settings for TLS configuration.
