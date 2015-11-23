@@ -3,6 +3,8 @@ package config
 type Config struct {
 	Ip           string `json:"ip,omitempty" toml:"ip" yaml:"ip,omitempty" hcl:"ip"`
 	Port         int    `json:"port,omitempty" toml:"port" yaml:"port,omitempty" hcl:"port"`
+	Username     string `json:"username,omitempty" toml:"username" yaml:"username,omitempty" hcl:"username"`
+	Password     string `json:"password,omitempty" toml:"password" yaml:"password,omitempty" hcl:"password"`
 	LogLevel     string `json:"log_level,omitempty" toml:"log_level" yaml:"log_level,omitempty" hcl:"log_level"`
 	Syslog       bool   `json:"syslog,omitempty" toml:"syslog" yaml:"syslog,omitempty" hcl:"syslog"`
 	MaxJobBytes  int64  `json:"max_job_bytes,omitempty" toml:"max_job_bytes" yaml:"max_job_bytes,omitempty" hcl:"max_job_bytes"`

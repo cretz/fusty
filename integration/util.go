@@ -2,6 +2,7 @@ package integration
 
 import (
 	"bytes"
+	"errors"
 	. "github.com/smartystreets/goconvey/convey"
 	"gitlab.com/cretz/fusty/config"
 	"io"
@@ -196,6 +197,7 @@ type fustyCmdAbstraction interface {
 	Exited() bool
 	Success() bool
 	Stop() error
+	Wait(maxSeconds int) error
 }
 
 func runFusty(c C, args ...string) *fustyCmd {
@@ -273,6 +275,16 @@ func (f *fustyCmdExternal) Stop() error {
 	return f.Cmd.Process.Kill()
 }
 
+func (f *fustyCmdExternal) Wait(maxSeconds int) error {
+	for i := 0; i < maxSeconds; i++ {
+		time.Sleep(time.Second)
+		if f.Exited() {
+			return nil
+		}
+	}
+	return errors.New("Did not complete in " + strconv.Itoa(maxSeconds) + " seconds")
+}
+
 type fustyCmdLocal struct {
 }
 
@@ -321,7 +333,7 @@ func (ctx *context) startControllerInBackground(c C, conf *config.Config, verify
 	c.So(err, ShouldBeNil)
 	bytes, err := conf.ToJSON(true)
 	c.So(err, ShouldBeNil)
-	log.Printf("Running controller with config and waiting 3 seconds to start: %v", string(bytes))
+	log.Printf("Running controller with config: %v", string(bytes))
 	args := []string{"controller", "-config", confFile}
 	if ctx.verbose {
 		args = append(args, "-verbose")

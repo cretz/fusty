@@ -43,18 +43,16 @@ func TestControllerTLS(t *testing.T) {
 
 			Convey("Then normal worker start should fail", func(c C) {
 				worker := ctx.startWorkerInBackground(c)
-				log.Print("Waiting 1 second for worker failure")
-				time.Sleep(time.Duration(1) * time.Second)
-				So(worker.Exited(), ShouldBeTrue)
+				So(worker.Wait(3), ShouldBeNil)
+				So(worker.Success(), ShouldBeFalse)
 				So(string(controller.StreamedOutput()), ShouldContainSubstring, "TLS handshake error")
 				So(string(worker.StreamedOutput()), ShouldContainSubstring, "malformed HTTP response")
 			})
 
 			Convey("Then a worker start asking for HTTPS without insecure setting should fail", func(c C) {
 				worker := ctx.startWorkerInBackgroundWithArgs(c, "-controller", "https://127.0.0.1:9400")
-				log.Print("Waiting 1 second for worker failure")
-				time.Sleep(time.Duration(1) * time.Second)
-				So(worker.Exited(), ShouldBeTrue)
+				So(worker.Wait(3), ShouldBeNil)
+				So(worker.Success(), ShouldBeFalse)
 				So(string(controller.StreamedOutput()), ShouldContainSubstring, "TLS handshake error")
 				So(string(worker.StreamedOutput()), ShouldContainSubstring, "certificate signed by unknown authority")
 			})

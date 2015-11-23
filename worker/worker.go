@@ -105,12 +105,12 @@ func NewWorker(conf *Config) (*Worker, error) {
 
 	// We need to ping the controller to make sure it's good
 	if Verbose {
-		log.Printf("Pinging worker at %v/worker/ping", conf.ControllerUrl)
+		log.Print("Pinging worker at /worker/ping")
 	}
 	if resp, err := worker.controllerClient.Get(conf.ControllerUrl + "/worker/ping"); err != nil {
-		return nil, fmt.Errorf("Unable to contact controller at %v/worker/ping: %v", conf.ControllerUrl, err)
+		return nil, fmt.Errorf("Unable to contact controller at /worker/ping: %v", err)
 	} else if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Bad status from %v/worker/ping: %v", conf.ControllerUrl, resp.StatusCode)
+		return nil, fmt.Errorf("Bad status from /worker/ping: %v", resp.StatusCode)
 	}
 
 	return worker, nil
@@ -119,6 +119,7 @@ func NewWorker(conf *Config) (*Worker, error) {
 // This blocks and never ends except in a panic
 func (w *Worker) Start() {
 	for {
+		w.tick()
 		w.tick()
 		// We will sleep half the amount of time range configured
 		// to fetch jobs for.

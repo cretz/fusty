@@ -31,7 +31,8 @@ syslog.
 A worker doesn't have a configuration file but it does have optional settings:
 
 * `-controller` - This is the base URL for the controller. If not provided, it assumes `http://127.0.0.1:9400`. If TLS
-  settings are present on the controller, use https.
+  settings are present on the controller, use https. If the controller has a username and password, supply that in the
+  URL.
 * `-tag` - This is the device tag that this worker accepts work for. This can be provided multiple times for multiple
   tags. If not provided, this worker accepts work for all device types.
 * `-sleep` - The number of seconds to wait to ask the controller for more work if none was given last request. The

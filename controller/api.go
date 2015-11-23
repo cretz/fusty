@@ -16,9 +16,9 @@ import (
 const MaxJobBytes int64 = 524288000
 
 func (c *Controller) addApiHandlers(mux *http.ServeMux) {
-	mux.HandleFunc("/worker/ping", c.apiWorkerPing)
-	mux.HandleFunc("/worker/next", c.apiWorkerNext)
-	mux.HandleFunc("/worker/complete", c.apiWorkerComplete)
+	mux.HandleFunc("/worker/ping", c.authedWebCall(c.apiWorkerPing))
+	mux.HandleFunc("/worker/next", c.authedWebCall(c.apiWorkerNext))
+	mux.HandleFunc("/worker/complete", c.authedWebCall(c.apiWorkerComplete))
 }
 
 func (c *Controller) apiWorkerPing(w http.ResponseWriter, req *http.Request) {

@@ -21,6 +21,12 @@ Below is a JSON configuration for general top-level settings for Fusty. Comments
 // The port to listen on. Default is 9400
 // "port": 9400,
 
+// The HTTP basic auth username of the web server. Default is no auth. Must be present with password.
+// "username": "someuser",
+
+// The HTTP basic auth password of the web server. Default is no auth. Must be present with username.
+// "password": "somepass",
+
 // The log level. Default is info
 // "log_level": "info",
 

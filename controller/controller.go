@@ -119,6 +119,9 @@ func (c *Controller) Start() error {
 	if port == 0 {
 		port = 9400
 	}
+	if (c.conf.Username == "") != (c.conf.Password == "") {
+		return errors.New("Username and password must be supplied together")
+	}
 	mux := http.NewServeMux()
 	c.addApiHandlers(mux)
 	server := &http.Server{
@@ -136,4 +139,29 @@ func (c *Controller) Start() error {
 	}
 	c.outLog.Printf("Starting HTTP controller on %v", server.Addr)
 	return server.ListenAndServe()
+}
+
+type webCall func(http.ResponseWriter, *http.Request)
+
+func (c *Controller) authedWebCall(handler webCall) webCall {
+	return func(w http.ResponseWriter, req *http.Request) {
+		if c.validateWebCall(w, req) {
+			handler(w, req)
+		}
+	}
+}
+
+func (c *Controller) validateWebCall(w http.ResponseWriter, req *http.Request) bool {
+	if c.conf.Username != "" {
+		if u, p, ok := req.BasicAuth(); !ok || u != c.conf.Username || p != c.conf.Password {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Header().Set("WWW-Authenticate", "Basic realm=\"Fusty\"")
+			return false
+		}
+	} else if req.Header.Get("Authorization") != "" {
+		// We want to fail if they give us auth but we don't need it
+		w.WriteHeader(http.StatusForbidden)
+		return false
+	}
+	return true
 }
